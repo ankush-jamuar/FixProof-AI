@@ -5,10 +5,17 @@ import { IssueCategory, IssueSeverity, WorkOrderStatus } from '@/types/domain';
 
 // In-memory fallback cache for local dev mode when Neon DATABASE_URL is not yet connected
 const memoryIssuesStore: any[] = [];
+const memoryWorkOrdersStore: any[] = [];
 const memoryTechniciansStore: any[] = [
   { id: 'tech-1', name: 'Rajesh Kumar (Lead Plumber)', category: 'plumbing', isAvailable: true, phone: '+1-555-0101', createdAt: new Date() },
-  { id: 'tech-2', name: 'Sarah Jenkins (Master Electrician)', category: 'electrical', isAvailable: true, phone: '+1-555-0201', createdAt: new Date() },
-  { id: 'tech-3', name: 'Amina Idris (Sanitation Supervisor)', category: 'cleaning', isAvailable: true, phone: '+1-555-0301', createdAt: new Date() },
+  { id: 'tech-2', name: 'Carlos Mendez (Plumbing Specialist)', category: 'plumbing', isAvailable: true, phone: '+1-555-0102', createdAt: new Date() },
+  { id: 'tech-3', name: 'David Chen (Pipe & Drainage Tech)', category: 'plumbing', isAvailable: false, phone: '+1-555-0103', createdAt: new Date() },
+  { id: 'tech-4', name: 'Sarah Jenkins (Master Electrician)', category: 'electrical', isAvailable: true, phone: '+1-555-0201', createdAt: new Date() },
+  { id: 'tech-5', name: 'Marcus Vance (High-Voltage Tech)', category: 'electrical', isAvailable: true, phone: '+1-555-0202', createdAt: new Date() },
+  { id: 'tech-6', name: 'Elena Rostova (Lighting & Wiring Tech)', category: 'electrical', isAvailable: false, phone: '+1-555-0203', createdAt: new Date() },
+  { id: 'tech-7', name: 'Amina Idris (Sanitation Supervisor)', category: 'cleaning', isAvailable: true, phone: '+1-555-0301', createdAt: new Date() },
+  { id: 'tech-8', name: 'Liam O\'Connor (Hazmat & Deep Clean Tech)', category: 'cleaning', isAvailable: true, phone: '+1-555-0302', createdAt: new Date() },
+  { id: 'tech-9', name: 'Priya Sharma (Facilities Cleaner)', category: 'cleaning', isAvailable: false, phone: '+1-555-0303', createdAt: new Date() },
 ];
 
 function isDatabaseConfigured() {
@@ -25,6 +32,18 @@ export async function getAllTechnicians() {
   } catch (err) {
     console.warn('⚠️ Neon DB query failed, using in-memory technician store fallback:', err);
     return memoryTechniciansStore;
+  }
+}
+
+export async function getTechnicianById(id: string) {
+  if (!isDatabaseConfigured()) {
+    return memoryTechniciansStore.find(t => t.id === id) || null;
+  }
+  try {
+    const results = await db.select().from(schema.technicians).where(eq(schema.technicians.id, id));
+    return results[0] || memoryTechniciansStore.find(t => t.id === id) || null;
+  } catch (err) {
+    return memoryTechniciansStore.find(t => t.id === id) || null;
   }
 }
 
@@ -162,6 +181,29 @@ export async function updateIssuePerception(
   }
 }
 
+export async function updateIssueStatus(issueId: string, status: WorkOrderStatus) {
+  if (!isDatabaseConfigured()) {
+    const item = memoryIssuesStore.find(i => i.id === issueId);
+    if (item) {
+      item.status = status;
+      item.updatedAt = new Date();
+      return item;
+    }
+    return null;
+  }
+  try {
+    const [updated] = await db
+      .update(schema.issues)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(schema.issues.id, issueId))
+      .returning();
+    return updated;
+  } catch (err) {
+    console.error(`Failed to update issue status for issue ${issueId}:`, err);
+    throw err;
+  }
+}
+
 export async function getAllIssues() {
   if (!isDatabaseConfigured()) {
     return memoryIssuesStore;
@@ -187,25 +229,172 @@ export async function getIssueById(id: string) {
   }
 }
 
+// ----------------------------------------------------
+// WORK ORDER HELPER QUERIES
+// ----------------------------------------------------
+
+export async function getWorkOrderByIssueId(issueId: string) {
+  if (!isDatabaseConfigured()) {
+    return memoryWorkOrdersStore.find(w => w.issueId === issueId) || null;
+  }
+  try {
+    const results = await db.select().from(schema.workOrders).where(eq(schema.workOrders.issueId, issueId));
+    return results[0] || null;
+  } catch (err) {
+    return memoryWorkOrdersStore.find(w => w.issueId === issueId) || null;
+  }
+}
+
+export async function createWorkOrderRecord(data: {
+  issueId: string;
+  technicianId?: string;
+  category: IssueCategory;
+  problem: string;
+  severity: IssueSeverity;
+  location: string;
+  description: string;
+  agentLogs?: any[];
+}) {
+  const existing = await getWorkOrderByIssueId(data.issueId);
+  if (existing) {
+    return existing; // Idempotency check: return existing work order
+  }
+
+  const now = new Date();
+
+  if (!isDatabaseConfigured()) {
+    const mockWO = {
+      id: `wo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      issueId: data.issueId,
+      technicianId: data.technicianId || null,
+      category: data.category,
+      problem: data.problem,
+      severity: data.severity,
+      location: data.location,
+      description: data.description,
+      status: 'ASSIGNED' as const,
+      agentLogs: data.agentLogs || [],
+      afterImageUrl: null,
+      technicianNotes: null,
+      assignedAt: now,
+      startedAt: null,
+      completedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    memoryWorkOrdersStore.unshift(mockWO);
+    await updateIssueStatus(data.issueId, 'ASSIGNED');
+    return mockWO;
+  }
+
+  try {
+    const [inserted] = await db
+      .insert(schema.workOrders)
+      .values({
+        issueId: data.issueId,
+        technicianId: data.technicianId,
+        category: data.category,
+        problem: data.problem,
+        severity: data.severity,
+        location: data.location,
+        description: data.description,
+        status: 'ASSIGNED',
+        agentLogs: data.agentLogs || [],
+        assignedAt: now,
+      })
+      .returning();
+
+    await updateIssueStatus(data.issueId, 'ASSIGNED');
+    return inserted;
+  } catch (err) {
+    console.error('Failed to create work order record:', err);
+    throw err;
+  }
+}
+
+export async function updateWorkOrderStatusRecord(
+  workOrderId: string,
+  newStatus: WorkOrderStatus,
+  additionalData?: {
+    afterImageUrl?: string;
+    technicianNotes?: string;
+  }
+) {
+  const now = new Date();
+  const updates: Record<string, any> = {
+    status: newStatus,
+    updatedAt: now,
+  };
+
+  if (newStatus === 'IN_PROGRESS') {
+    updates.startedAt = now;
+  } else if (newStatus === 'PENDING_VERIFICATION') {
+    updates.completedAt = now;
+    if (additionalData?.afterImageUrl) updates.afterImageUrl = additionalData.afterImageUrl;
+    if (additionalData?.technicianNotes) updates.technicianNotes = additionalData.technicianNotes;
+  }
+
+  if (!isDatabaseConfigured()) {
+    const item = memoryWorkOrdersStore.find(w => w.id === workOrderId);
+    if (item) {
+      Object.assign(item, updates);
+      await updateIssueStatus(item.issueId, newStatus);
+      return item;
+    }
+    return null;
+  }
+
+  try {
+    const [updatedWO] = await db
+      .update(schema.workOrders)
+      .set(updates)
+      .where(eq(schema.workOrders.id, workOrderId))
+      .returning();
+
+    if (updatedWO) {
+      await updateIssueStatus(updatedWO.issueId, newStatus);
+    }
+    return updatedWO;
+  } catch (err) {
+    console.error(`Failed to update work order ${workOrderId} status:`, err);
+    throw err;
+  }
+}
+
 export async function getAllWorkOrders() {
   if (!isDatabaseConfigured()) {
-    return [];
+    return memoryWorkOrdersStore;
   }
   try {
     return await db.select().from(schema.workOrders).orderBy(desc(schema.workOrders.createdAt));
   } catch (err) {
-    return [];
+    return memoryWorkOrdersStore;
   }
 }
 
 export async function getWorkOrderById(id: string) {
   if (!isDatabaseConfigured()) {
-    return null;
+    return memoryWorkOrdersStore.find(w => w.id === id) || null;
   }
   try {
     const results = await db.select().from(schema.workOrders).where(eq(schema.workOrders.id, id));
-    return results[0] || null;
+    return results[0] || memoryWorkOrdersStore.find(w => w.id === id) || null;
   } catch (err) {
-    return null;
+    return memoryWorkOrdersStore.find(w => w.id === id) || null;
+  }
+}
+
+export async function getWorkOrdersByTechnicianId(technicianId: string) {
+  if (!isDatabaseConfigured()) {
+    return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId);
+  }
+  try {
+    return await db
+      .select()
+      .from(schema.workOrders)
+      .where(eq(schema.workOrders.technicianId, technicianId))
+      .orderBy(desc(schema.workOrders.createdAt));
+  } catch (err) {
+    return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId);
   }
 }

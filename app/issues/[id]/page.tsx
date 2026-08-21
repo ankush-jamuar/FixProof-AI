@@ -1,6 +1,8 @@
 import Link from 'next/link';
-import { getIssueById } from '@/lib/db/queries';
+import { getIssueById, getWorkOrderByIssueId, getTechnicianById } from '@/lib/db/queries';
 import AnalyzeButton from '@/components/issues/AnalyzeButton';
+import SupervisorOverride from '@/components/issues/SupervisorOverride';
+import AgentDispatchButton from '@/components/issues/AgentDispatchButton';
 import { 
   MapPin, 
   Clock, 
@@ -12,7 +14,10 @@ import {
   Cpu,
   Eye,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Wrench,
+  UserCheck,
+  FileCheck
 } from 'lucide-react';
 import { IssueCategory, IssueSeverity, WorkOrderStatus } from '@/types/domain';
 
@@ -73,11 +78,16 @@ export default async function IssueDetailPage({ params }: PageProps) {
     );
   }
 
+  const workOrder = await getWorkOrderByIssueId(issue.id);
+  const assignedTechnician = workOrder?.technicianId ? await getTechnicianById(workOrder.technicianId) : null;
+
   const hasAnalyzed = Boolean(issue.aiCategory && issue.aiConfidence !== null);
   const confidencePercent = issue.aiConfidence !== null && issue.aiConfidence !== undefined 
     ? Math.round(issue.aiConfidence * 100) 
     : 0;
   const isHighConfidence = confidencePercent >= 80;
+  const isPendingReview = issue.status === 'PENDING_REVIEW';
+  const isAssignedOrBeyond = ['ASSIGNED', 'IN_PROGRESS', 'PENDING_VERIFICATION', 'VERIFIED', 'CLOSED'].includes(issue.status);
 
   return (
     <div className="space-y-8 py-4">
@@ -99,7 +109,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
       {/* Main Grid: Evidence & Details vs AI Perception Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column (2 Cols): Evidence & Details */}
+        {/* Left Column (2 Cols): Evidence, Work Order, and Side-by-Side Photos */}
         <div className="lg:col-span-2 space-y-6">
           
           {/* Main Evidence Card */}
@@ -107,9 +117,9 @@ export default async function IssueDetailPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 text-xs font-mono">
                 <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                ORIGINAL EVIDENCE PHOTO
+                ORIGINAL REPORT EVIDENCE
               </div>
-              <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-900 text-cyan-300 border border-slate-800">
+              <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-900 text-cyan-300 border border-slate-800 font-bold uppercase">
                 STATUS: {issue.status}
               </span>
             </div>
@@ -148,38 +158,108 @@ export default async function IssueDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Reserved Section for Future Stages */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="glass-panel p-5 rounded-2xl border border-slate-800/80 space-y-3">
-              <div className="flex items-center gap-2 text-indigo-400 font-mono text-xs">
-                <Cpu className="w-4 h-4" />
-                AI AGENT & CONTROLLED TOOLS
+          {/* Active Work Order & Assigned Technician Details */}
+          {workOrder && (
+            <div className="glass-panel p-6 rounded-2xl border border-indigo-900/50 space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-indigo-300 font-mono text-xs font-bold uppercase">
+                  <Wrench className="w-4 h-4 text-indigo-400" />
+                  Work Order Dispatch #{workOrder.id.slice(0, 8)}
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-indigo-950 text-indigo-300 border border-indigo-700">
+                  {workOrder.status}
+                </span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Technician matching and controlled tool operations occur in Stage 5.
-              </p>
-              <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-slate-500 text-[11px] font-mono border border-slate-800">
-                STAGE 5 REASONING PENDING
-              </span>
-            </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 font-mono text-[10px] uppercase block">ASSIGNED TECHNICIAN</span>
+                  <div className="flex items-center gap-2 text-white font-bold text-sm">
+                    <UserCheck className="w-4 h-4 text-cyan-400" />
+                    {assignedTechnician?.name || 'Assigned Technician'}
+                  </div>
+                  <p className="text-slate-400 text-[11px]">{assignedTechnician?.phone || '+1-555-0101'}</p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 font-mono text-[10px] uppercase block">ROUTED CATEGORY & SEVERITY</span>
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <CategoryBadge category={workOrder.category as IssueCategory} />
+                    <SeverityBadge severity={workOrder.severity as IssueSeverity} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent Decision Audit Log */}
+              {workOrder.agentLogs && (workOrder.agentLogs as any[]).length > 0 && (
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs">
+                  <span className="text-cyan-400 font-mono text-[10px] uppercase tracking-wider block">
+                    AI Agent Reasoning Audit Trail
+                  </span>
+                  <p className="text-slate-300 font-mono text-[11px] leading-relaxed">
+                    {(workOrder.agentLogs as any[])[0]?.details || 'Agent selected technician based on category matching and availability.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Before Photo vs After Photo Comparison (Shown when Repair Submitted) */}
+          {workOrder?.afterImageUrl && (
+            <div className="glass-panel p-6 rounded-2xl border border-yellow-800/60 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-yellow-300 font-mono text-xs font-bold">
+                  <FileCheck className="w-4 h-4 text-yellow-400" />
+                  REPAIR EVIDENCE COMPARISON (BEFORE vs AFTER)
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-yellow-950 text-yellow-300 border border-yellow-700">
+                  PENDING VERIFICATION
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase block">BEFORE REPAIR (ORIGINAL)</span>
+                  <div className="relative rounded-xl overflow-hidden border border-slate-800 h-48 bg-slate-950">
+                    <img src={issue.beforeImageUrl} alt="Before repair" className="w-full h-full object-cover" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-mono text-emerald-400 uppercase font-bold block">AFTER REPAIR (TECHNICIAN PROOF)</span>
+                  <div className="relative rounded-xl overflow-hidden border border-emerald-800 h-48 bg-slate-950">
+                    <img src={workOrder.afterImageUrl} alt="After repair" className="w-full h-full object-cover" />
+                  </div>
+                </div>
+              </div>
+
+              {workOrder.technicianNotes && (
+                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300">
+                  <span className="text-slate-500 font-mono text-[10px] uppercase block mb-0.5">Technician Repair Notes:</span>
+                  "{workOrder.technicianNotes}"
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Reserved Section for Stage 7 Verification */}
+          {!workOrder?.afterImageUrl && (
             <div className="glass-panel p-5 rounded-2xl border border-slate-800/80 space-y-3">
               <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
                 <Eye className="w-4 h-4" />
-                2ND STAGE AI VERIFICATION
+                2ND STAGE AI VERIFICATION ENGINE
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Before vs After visual repair verification occurs in Stage 7.
+                Independent visual verification comparing Before vs After repair photos will execute here in Stage 7 once technician completes work.
               </p>
               <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-slate-500 text-[11px] font-mono border border-slate-800">
                 STAGE 7 VERIFICATION PENDING
               </span>
             </div>
-          </div>
+          )}
 
         </div>
 
-        {/* Right Column (1 Col): AI Perception Sidebar & Action */}
+        {/* Right Column (1 Col): AI Perception, Agent Routing, & Timeline Sidebar */}
         <div className="space-y-6">
           
           {/* AI Perception Engine Card */}
@@ -210,7 +290,6 @@ export default async function IssueDetailPage({ params }: PageProps) {
                     </span>
                   </div>
                   
-                  {/* Meter bar */}
                   <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
                     <div
                       className={`h-full transition-all duration-500 ${isHighConfidence ? 'bg-gradient-to-r from-cyan-500 to-emerald-500' : 'bg-gradient-to-r from-amber-500 to-rose-500'}`}
@@ -218,7 +297,6 @@ export default async function IssueDetailPage({ params }: PageProps) {
                     ></div>
                   </div>
 
-                  {/* High Confidence vs Human Review Banner */}
                   <div className="pt-1">
                     {isHighConfidence ? (
                       <div className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
@@ -251,61 +329,58 @@ export default async function IssueDetailPage({ params }: PageProps) {
                   </div>
                 </div>
 
-                {/* Identified Problem */}
+                {/* Problem & Reasoning */}
                 <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
                   <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block">
                     AI Identified Problem
                   </span>
-                  <p className="text-xs text-white font-medium">
-                    {issue.aiProblem}
-                  </p>
+                  <p className="text-xs text-white font-medium">{issue.aiProblem}</p>
                 </div>
 
-                {/* Evidence Reasoning */}
                 <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
                   <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
                     Evidence-Based Reasoning
                   </span>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    {issue.aiReasoning}
-                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">{issue.aiReasoning}</p>
                 </div>
-
-                {/* Model Telemetry */}
-                <div className="pt-2 border-t border-slate-800/80 space-y-1 font-mono text-[10px] text-slate-500">
-                  <div className="flex items-center justify-between">
-                    <span>Model:</span>
-                    <span className="text-slate-400">{issue.aiModel || 'gemini-2.5-flash'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Prompt Ver:</span>
-                    <span className="text-slate-400">{issue.aiPromptVersion || 'v1'}</span>
-                  </div>
-                  {issue.aiLatencyMs && (
-                    <div className="flex items-center justify-between">
-                      <span>Latency:</span>
-                      <span className="text-slate-400">{issue.aiLatencyMs} ms</span>
-                    </div>
-                  )}
-                </div>
-
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
                 <Clock className="w-6 h-6 text-slate-500 mx-auto animate-pulse" />
                 <span className="text-xs font-medium text-slate-300 block">AI Analysis Pending</span>
                 <p className="text-[11px] text-slate-500 leading-normal">
-                  Click "Analyze Issue with AI" above to run multimodal vision parsing into structured category and severity schemas.
+                  Click "Analyze Issue with AI" above to run multimodal vision parsing.
                 </p>
               </div>
             )}
           </div>
 
-          {/* Timeline */}
+          {/* AI Agent Routing & Dispatch Card */}
+          {hasAnalyzed && !isAssignedOrBeyond && (
+            <div className="glass-panel rounded-2xl border border-indigo-900/60 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-indigo-400" />
+                  AI Agent Dispatch
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                  BLOCK 3
+                </span>
+              </div>
+
+              {isPendingReview ? (
+                <SupervisorOverride issueId={issue.id} aiCategory={issue.aiCategory} />
+              ) : (
+                <AgentDispatchButton issueId={issue.id} />
+              )}
+            </div>
+          )}
+
+          {/* Workflow Timeline */}
           <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4">
             <h3 className="font-bold text-white text-sm flex items-center gap-2">
               <Activity className="w-4 h-4 text-cyan-400" />
-              Workflow Timeline
+              Closed-Loop Lifecycle
             </h3>
 
             <div className="relative pl-6 space-y-5 border-l border-slate-800 text-xs">
@@ -326,18 +401,32 @@ export default async function IssueDetailPage({ params }: PageProps) {
                     2. AI Perception Analysis
                   </h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {hasAnalyzed 
-                      ? `${issue.aiCategory?.toUpperCase()} (${confidencePercent}% confidence)` 
-                      : 'Pending manual trigger'}
+                    {hasAnalyzed ? `${issue.aiCategory?.toUpperCase()} (${confidencePercent}% confidence)` : 'Pending'}
                   </p>
                 </div>
               </div>
 
-              <div className="relative opacity-50">
-                <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-slate-800 border-2 border-slate-950"></div>
+              <div className={`relative ${isAssignedOrBeyond ? '' : 'opacity-50'}`}>
+                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${isAssignedOrBeyond ? 'bg-blue-500' : 'bg-slate-800'}`}></div>
                 <div>
-                  <h4 className="font-medium text-slate-400">3. Work Order Routing</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Stage 5 agent tool selection</p>
+                  <h4 className={`font-medium ${isAssignedOrBeyond ? 'text-blue-300 font-bold' : 'text-slate-400'}`}>
+                    3. Work Order Assigned
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {workOrder ? `Technician: ${assignedTechnician?.name || 'Assigned'}` : 'Pending Agent Routing'}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`relative ${workOrder?.afterImageUrl ? '' : 'opacity-50'}`}>
+                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${workOrder?.afterImageUrl ? 'bg-yellow-500' : 'bg-slate-800'}`}></div>
+                <div>
+                  <h4 className={`font-medium ${workOrder?.afterImageUrl ? 'text-yellow-300 font-bold' : 'text-slate-400'}`}>
+                    4. Repair Submitted
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {workOrder?.afterImageUrl ? 'Pending Stage 7 Verification' : 'Pending Technician Work'}
+                  </p>
                 </div>
               </div>
             </div>
