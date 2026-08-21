@@ -7,15 +7,11 @@ import {
   CheckCircle2, 
   XCircle, 
   Loader2, 
-  ShieldAlert, 
   ShieldCheck, 
-  Cpu, 
   Activity, 
   ChevronDown, 
   ChevronUp,
-  Clock,
-  Zap,
-  AlertTriangle
+  Info
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 import { EVALUATION_CASES } from '@/lib/evaluation/cases';
@@ -129,6 +125,17 @@ export default function EvaluationHarnessPage() {
         />
       )}
 
+      {/* Disclaimer Banner: Benchmark vs Real-World Accuracy */}
+      <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-start gap-3 text-xs text-slate-300">
+        <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <span className="font-bold text-white block">System Benchmark Evaluation vs Real-World AI Vision Accuracy</span>
+          <p className="text-slate-400 text-[11px] leading-relaxed">
+            These 15 benchmark test cases evaluate system workflow integrity, state machine safeguards, and controlled tool safety. Real-world Gemini API vision perception and verification accuracy depend on ambient lighting, photo resolution, and visual evidence quality.
+          </p>
+        </div>
+      </div>
+
       {/* Metrics Header Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -146,7 +153,7 @@ export default function EvaluationHarnessPage() {
 
         <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2">
           <span className="text-slate-400 font-mono text-[11px] uppercase tracking-wider block">
-            PASS RATE
+            BENCHMARK PASS RATE
           </span>
           <div className="flex items-baseline justify-between">
             <span className={`text-3xl font-extrabold font-mono ${
