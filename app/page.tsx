@@ -1,236 +1,204 @@
 import Link from 'next/link';
-import { 
-  AlertCircle, 
-  CheckCircle2, 
-  Eye, 
-  Wrench, 
-  ShieldCheck, 
-  RotateCcw, 
-  ArrowRight, 
-  Zap, 
-  FileText,
-  BarChart2
+import {
+  LayoutDashboard,
+  Wrench,
+  AlertCircle,
+  Cpu,
+  ArrowRight
 } from 'lucide-react';
 
-export default function Home() {
-  const steps = [
-    {
-      step: '01',
-      title: 'PERCEIVE',
-      description: 'Multimodal AI extracts category, problem & severity from image + text evidence with structured output schemas.',
-      icon: Eye,
-      color: 'text-cyan-400',
-      bg: 'bg-cyan-500/10 border-cyan-500/20'
-    },
-    {
-      step: '02',
-      title: 'VALIDATE',
-      description: 'Business rules validate confidence score against threshold (0.80). Low confidence or contradiction flags for human review.',
-      icon: ShieldCheck,
-      color: 'text-amber-400',
-      bg: 'bg-amber-500/10 border-amber-500/20'
-    },
-    {
-      step: '03',
-      title: 'REASON & ACT',
-      description: 'AI agent queries inventory and technician availability via controlled tools to create and assign work orders.',
-      icon: Zap,
-      color: 'text-indigo-400',
-      bg: 'bg-indigo-500/10 border-indigo-500/20'
-    },
-    {
-      step: '04',
-      title: 'VERIFY',
-      description: 'A 2nd independent AI model compares BEFORE vs AFTER repair photos to objectively output PASS or FAIL.',
-      icon: CheckCircle2,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10 border-emerald-500/20'
-    },
-    {
-      step: '05',
-      title: 'RECOVER',
-      description: 'On verification FAIL, the issue automatically reopens, escalates, and re-routes without closing fraudulently.',
-      icon: RotateCcw,
-      color: 'text-rose-400',
-      bg: 'bg-rose-500/10 border-rose-500/20'
-    }
-  ];
+export const revalidate = 0; // Server-rendered on every request
 
-  const portals = [
-    {
-      title: 'Report Maintenance Issue',
-      href: '/report',
-      desc: 'Submit photo, text description & location for instant AI perception parsing.',
-      icon: AlertCircle,
-      badge: 'User / Supervisor',
-      color: 'from-cyan-500 to-blue-600'
-    },
-    {
-      title: 'Supervisor Dashboard & Agent',
-      href: '/issues',
-      desc: 'Track reported issues, inspect AI agent reasoning steps & tool actions.',
-      icon: ShieldCheck,
-      badge: 'Supervisor Portal',
-      color: 'from-indigo-500 to-purple-600'
-    },
-    {
-      title: 'Technician Work Order Portal',
-      href: '/technician',
-      desc: 'View assigned jobs, update work status & upload after-repair image proof.',
-      icon: Wrench,
-      badge: 'Technician Interface',
-      color: 'from-amber-500 to-orange-600'
-    },
-    {
-      title: 'AI Verification Audit',
-      href: '/verification',
-      desc: 'Independent 2nd model visual diff comparison (Before vs After repair).',
-      icon: Eye,
-      badge: 'Verification Engine',
-      color: 'from-emerald-500 to-teal-600'
-    },
-    {
-      title: 'Evaluation Benchmark Harness',
-      href: '/evaluation',
-      desc: 'Run 20 live evaluation cases (plumbing, electrical, cleaning & failure modes).',
-      icon: BarChart2,
-      badge: 'Red-Team Harness',
-      color: 'from-rose-500 to-pink-600'
-    }
-  ];
-
+export default function LandingPage() {
   return (
-    <div className="space-y-10 py-4">
+    <div className="space-y-12 py-6">
       
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-2xl glass-panel p-8 md:p-12 border border-slate-800">
-        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 -mb-12 -ml-12 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-cyan-900/50 space-y-6 text-center relative overflow-hidden">
 
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 text-xs font-mono">
-            <Zap className="w-3.5 h-3.5 text-cyan-400" />
-            CLOSED-LOOP AI MAINTENANCE ENGINE
-          </div>
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Prove Maintenance Is Fixed. <br />
-            <span className="gradient-text-cyan">Never Trust Verbal Claims.</span>
+        {/* Demo Mode Badge */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-cyan-300 text-xs font-mono">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+          </span>
+          DEMO PRESENTATION ENVIRONMENT &bull; ROLE SELECTION ACTIVE
+        </div>
+
+        <div className="max-w-4xl mx-auto space-y-4">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white font-mono leading-tight">
+            FixProof <span className="gradient-text-cyan">AI</span>
           </h1>
-
-          <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-            FixProof AI automates campus maintenance workflows from initial visual perception and safe tool-assisted routing to independent 2nd-stage visual repair verification and failure recovery.
-          </p>
-
-          <div className="pt-2 flex flex-wrap gap-4">
-            <Link
-              href="/report"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium text-sm shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all"
-            >
-              Report an Issue
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/issues"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-medium text-sm hover:bg-slate-800 hover:border-slate-600 transition-all"
-            >
-              Supervisor Console
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Closed-Loop Workflow Pipeline */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <FileText className="w-5 h-5 text-cyan-400" />
-            The 5-Stage Closed-Loop Architecture
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-300">
+            Closed-Loop Campus Maintenance Intelligence Platform
           </h2>
-          <span className="text-xs font-mono text-slate-400">P0 MVP CORE</span>
+          <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto font-sans">
+            FixProof AI transforms raw visual evidence into an accountable, closed-loop maintenance workflow — from AI perception diagnosis and autonomous dispatch to technician repair proof, multimodal AI verification, recovery loops, and immutable audit closure.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {steps.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.step}
-                className={`rounded-xl p-5 border ${item.bg} glass-panel flex flex-col justify-between space-y-3`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-slate-400">{item.step}</span>
-                  <Icon className={`w-5 h-5 ${item.color}`} />
-                </div>
-                <div>
-                  <h3 className={`font-bold text-sm tracking-wide ${item.color}`}>{item.title}</h3>
-                  <p className="text-slate-300 text-xs mt-1 leading-relaxed">{item.description}</p>
-                </div>
+        {/* Closed-Loop Core Value Lifecycle Pill */}
+        <div className="pt-4 flex flex-wrap items-center justify-center gap-2 text-xs font-mono text-slate-400">
+          <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-cyan-300">1. SEE</span>
+          <span className="text-slate-600">&rarr;</span>
+          <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-indigo-300">2. UNDERSTAND</span>
+          <span className="text-slate-600">&rarr;</span>
+          <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-purple-300">3. DISPATCH</span>
+          <span className="text-slate-600">&rarr;</span>
+          <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-amber-300">4. REPAIR</span>
+          <span className="text-slate-600">&rarr;</span>
+          <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-emerald-300">5. VERIFY</span>
+          <span className="text-slate-600">&rarr;</span>
+          <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-rose-300">6. RECOVER</span>
+        </div>
+
+      </div>
+
+      {/* Role Entrance Selector Cards */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="font-bold text-white text-base flex items-center gap-2 font-mono">
+            <Cpu className="w-4 h-4 text-cyan-400" />
+            Select Evaluator Presentation Role
+          </h3>
+          <span className="text-xs font-mono text-slate-500">
+            Authentication is disabled for evaluator review
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          {/* Role Card 1: Supervisor Operations Console */}
+          <Link
+            href="/supervisor"
+            className="glass-panel glass-panel-interactive p-6 rounded-2xl border border-indigo-900/60 flex flex-col justify-between space-y-6 group"
+          >
+            <div className="space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-950/80 border border-indigo-700/60 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                <LayoutDashboard className="w-6 h-6" />
               </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* System Portals Grid */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-bold text-white tracking-tight">System Navigation Portals</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {portals.map((portal) => {
-            const Icon = portal.icon;
-            return (
-              <Link
-                key={portal.href}
-                href={portal.href}
-                className="group relative rounded-xl glass-panel glass-panel-interactive p-6 border border-slate-800 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className={`p-2.5 rounded-lg bg-gradient-to-br ${portal.color} text-white shadow-md`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
-                      {portal.badge}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-white group-hover:text-cyan-300 transition-colors flex items-center gap-1.5">
-                      {portal.title}
-                      <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-cyan-400" />
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">{portal.desc}</p>
-                  </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider font-bold">OPERATIONS</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-950 text-indigo-300 border border-indigo-800">SUPERVISOR</span>
                 </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+                <h4 className="text-xl font-bold text-white tracking-tight">Supervisor Operations Console</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Real-time operational dashboard for monitoring open incidents, SLA risk levels, AI agent dispatches, confidence flags, and supervisor overrides.
+                </p>
+              </div>
+            </div>
 
-      {/* Originality Constraints Box */}
-      <section className="rounded-xl bg-slate-950/80 border border-slate-800 p-6 space-y-4">
-        <h3 className="text-sm font-bold text-slate-300 tracking-wider uppercase flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-cyan-400" />
-          Hackathon Originality Constraints Target
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/80">
-            <span className="font-bold text-cyan-300 block mb-1">1. Two Models Cooperating</span>
-            <p className="text-slate-400">Model 1 (Perception) extracts issue schemas. Model 2 (Verification) independently checks repair proof without perception bias.</p>
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-mono font-bold text-indigo-400 group-hover:text-indigo-300">
+              <span>Enter Supervisor View</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Role Card 2: Technician Field Portal */}
+          <Link
+            href="/technician"
+            className="glass-panel glass-panel-interactive p-6 rounded-2xl border border-cyan-900/60 flex flex-col justify-between space-y-6 group"
+          >
+            <div className="space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-950/80 border border-cyan-700/60 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
+                <Wrench className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-bold font-mono">FIELD OPERATIONS</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">TECHNICIAN</span>
+                </div>
+                <h4 className="text-xl font-bold text-white tracking-tight">Technician Field Portal</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Mobile-optimized field workspace for inspecting assigned repair tasks, starting on-site work, and uploading after-repair photo evidence.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-mono font-bold text-cyan-400 group-hover:text-cyan-300">
+              <span>Enter Technician View</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          {/* Role Card 3: Report Incident Intake */}
+          <Link
+            href="/report"
+            className="glass-panel glass-panel-interactive p-6 rounded-2xl border border-purple-900/60 flex flex-col justify-between space-y-6 group"
+          >
+            <div className="space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-950/80 border border-purple-700/60 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-purple-400 uppercase tracking-wider font-bold">INCIDENT INTAKE</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-950 text-purple-300 border border-purple-800">NEW REPORT</span>
+                </div>
+                <h4 className="text-xl font-bold text-white tracking-tight">Report New Incident</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Submit visual evidence and problem details to initiate the AI perception parsing, classification, and autonomous agent routing pipeline.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs font-mono font-bold text-purple-400 group-hover:text-purple-300">
+              <span>Start Incident Intake</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+        </div>
+      </div>
+
+      {/* Closed-Loop AI Maintenance Narrative Showcase */}
+      <div className="glass-panel p-8 rounded-3xl border border-slate-800 space-y-6">
+        <div className="space-y-2">
+          <span className="text-xs font-mono text-cyan-400 uppercase tracking-wider font-bold block">
+            HOW FIXPROOF AI DIFFERENTIATES FROM A GENERIC AI WRAPPER
+          </span>
+          <h3 className="text-2xl font-bold text-white tracking-tight">
+            Accountable Operational AI Lifecycle Architecture
+          </h3>
+          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-3xl">
+            Generic AI wrappers merely generate text answers. FixProof AI operates a closed-loop visual maintenance pipeline with deterministic application rules, safety thresholds, and 2nd-stage visual verification.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+            <span className="text-cyan-400 font-bold block">1. MULTIMODAL PERCEPTION</span>
+            <p className="text-slate-300 font-sans text-[11px] leading-relaxed">
+              Google Gemini vision models parse visual evidence, categorize defects, and score confidence against an 80% safety threshold.
+            </p>
           </div>
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/80">
-            <span className="font-bold text-amber-300 block mb-1">2. Degrade Gracefully</span>
-            <p className="text-slate-400">AI rate limit, timeout, or schema failure triggers safe retries or flags issues as `PENDING_REVIEW` without crashing.</p>
+
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+            <span className="text-indigo-400 font-bold block">2. CONTROLLED DISPATCH</span>
+            <p className="text-slate-300 font-sans text-[11px] leading-relaxed">
+              AI Agent executes step-by-step controlled tools to match active available technicians without arbitrary database writes.
+            </p>
           </div>
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800/80">
-            <span className="font-bold text-rose-300 block mb-1">3. Handle Being Wrong</span>
-            <p className="text-slate-400">Uncertainty visible to supervisors. Verification FAIL automatically reopens work orders instead of false closing.</p>
+
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+            <span className="text-emerald-400 font-bold block">3. 2ND-STAGE VERIFICATION</span>
+            <p className="text-slate-300 font-sans text-[11px] leading-relaxed">
+              Independent vision model compares Before vs After photos side-by-side to confirm problem resolution before closing the job.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+            <span className="text-rose-400 font-bold block">4. RECOVERY & AUDIT</span>
+            <p className="text-slate-300 font-sans text-[11px] leading-relaxed">
+              Verification failures automatically reopen work orders for technician retries while recording an immutable audit trail.
+            </p>
           </div>
         </div>
-      </section>
+      </div>
 
     </div>
   );

@@ -7,6 +7,8 @@ import {
   getLatestVerificationResult
 } from '@/lib/db/queries';
 import { getAuditTrailForIssue } from '@/lib/audit/logger';
+import { computeOperationalRisk } from '@/lib/operationalRisk';
+import ClosedLoopPipelineBar from '@/components/issues/ClosedLoopPipelineBar';
 import AnalyzeButton from '@/components/issues/AnalyzeButton';
 import SupervisorOverride from '@/components/issues/SupervisorOverride';
 import AgentDispatchButton from '@/components/issues/AgentDispatchButton';
@@ -28,10 +30,13 @@ import {
   Wrench,
   UserCheck,
   ShieldCheck,
+  ShieldAlert,
   XCircle,
-  History
+  History,
+  Info
 } from 'lucide-react';
-import { IssueCategory, IssueSeverity, VerificationResult } from '@/types/domain';
+import { IssueCategory, IssueSeverity, VerificationResult, WorkOrderStatus } from '@/types/domain';
+import SafeImage from '@/components/ui/SafeImage';
 
 export const revalidate = 0; // Server-rendered on every request
 
@@ -119,10 +124,10 @@ export default async function IssueDetailPage({ params }: PageProps) {
         </p>
         <div className="pt-2">
           <Link
-            href="/issues"
+            href="/supervisor"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-cyan-400 text-xs font-medium hover:bg-slate-800"
           >
-            &larr; Return to Issue Console
+            &larr; Return to Supervisor Console
           </Link>
         </div>
       </div>
@@ -134,6 +139,12 @@ export default async function IssueDetailPage({ params }: PageProps) {
   const verificationHistory = workOrder ? await getVerificationHistoryByWorkOrderId(workOrder.id) : [];
   const latestVerification = workOrder ? await getLatestVerificationResult(workOrder.id) : null;
   const auditEvents = await getAuditTrailForIssue(issue.id);
+
+  const risk = computeOperationalRisk({
+    severity: issue.aiSeverity,
+    status: issue.status as WorkOrderStatus,
+    aiConfidence: issue.aiConfidence,
+  });
 
   const hasAnalyzed = Boolean(issue.aiCategory && issue.aiConfidence !== null);
   const confidencePercent = issue.aiConfidence !== null && issue.aiConfidence !== undefined 
@@ -160,29 +171,45 @@ export default async function IssueDetailPage({ params }: PageProps) {
       {/* Top Bar Navigation */}
       <div className="flex items-center justify-between">
         <Link
-          href="/issues"
-          className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-cyan-400 transition-colors"
+          href="/supervisor"
+          className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-cyan-400 transition-colors font-mono"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Supervisor Issue Management
+          Back to Supervisor Operations Console
         </Link>
-        <span className="text-xs font-mono text-slate-500">
-          ISSUE ID: <span className="text-cyan-400">{issue.id.slice(0, 8)}...</span>
-        </span>
+
+        <div className="flex items-center gap-3">
+          {/* Operational Risk Badge */}
+          <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border ${risk.badgeStyle}`}>
+            RISK: {risk.level} ATTENTION
+          </span>
+          <span className="text-xs font-mono text-slate-500">
+            ISSUE ID: <span className="text-cyan-400 font-bold">{issue.id.slice(0, 8)}...</span>
+          </span>
+        </div>
       </div>
 
-      {/* Main Grid: Evidence & Verification vs AI Sidebar */}
+      {/* Closed-Loop Pipeline Lifecycle Visual Bar */}
+      <ClosedLoopPipelineBar
+        status={issue.status as WorkOrderStatus}
+        hasAnalyzed={hasAnalyzed}
+        hasAfterPhoto={Boolean(workOrder?.afterImageUrl)}
+        hasVerified={Boolean(latestVerification)}
+        isReopened={isReopened}
+      />
+
+      {/* Main Grid: Command Center Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column (2 Cols): Evidence, Work Order, Verification Results & Comparison */}
+        {/* Left Column (2 Cols): Visual Evidence, Dispatch, Verification, Recovery */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Main Evidence Card */}
+          {/* SECTION 1 — WHAT HAPPENED? (Main Evidence & Visual Intake) */}
           <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 text-xs font-mono">
                 <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                ORIGINAL REPORT EVIDENCE
+                SECTION 1: ORIGINAL INCIDENT EVIDENCE & INTAKE
               </div>
               <span className={`px-2.5 py-1 rounded-full text-xs font-mono border font-bold uppercase ${
                 isVerifiedOrClosed
@@ -195,10 +222,11 @@ export default async function IssueDetailPage({ params }: PageProps) {
               </span>
             </div>
 
-            <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-              <img
+            <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 min-h-[220px]">
+              <SafeImage
                 src={issue.beforeImageUrl}
                 alt={issue.title}
+                fallbackLabel="Original Evidence Photo"
                 className="w-full max-h-[420px] object-contain bg-slate-950"
               />
             </div>
@@ -206,50 +234,53 @@ export default async function IssueDetailPage({ params }: PageProps) {
             <div className="space-y-3 pt-2">
               <h1 className="text-2xl font-bold text-white tracking-tight">{issue.title}</h1>
               
-              <div className="flex items-center gap-2 text-sm text-cyan-300 font-medium">
+              <div className="flex items-center gap-2 text-sm text-cyan-300 font-medium font-mono">
                 <MapPin className="w-4 h-4 text-cyan-400" />
                 <span>{issue.location}</span>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-1">
                 <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">
-                  Original User Description
+                  User Reported Description
                 </span>
                 <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
                   {issue.description}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-500 font-mono pt-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-mono pt-2 border-t border-slate-800/80">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
                   Reported: {formatDateString(issue.createdAt)}
+                </span>
+                <span className="text-slate-400 font-bold">
+                  Operational Risk Reason: <span className="text-cyan-300">{risk.reason}</span>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Active Work Order & Assigned Technician Details */}
+          {/* SECTION 2 — WHAT SHOULD HAPPEN? (Work Order & Dispatch Details) */}
           {workOrder && (
             <div className="glass-panel p-6 rounded-2xl border border-indigo-900/50 space-y-5">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2 text-indigo-300 font-mono text-xs font-bold uppercase">
                   <Wrench className="w-4 h-4 text-indigo-400" />
-                  Work Order Dispatch #{workOrder.id.slice(0, 8)}
+                  SECTION 2: WORK ORDER DISPATCH & TECHNICIAN ASSIGNMENT
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-indigo-950 text-indigo-300 border border-indigo-700">
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-indigo-950 text-indigo-300 border border-indigo-700 font-bold">
                   {workOrder.status}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                  <span className="text-slate-400 font-mono text-[10px] uppercase block">ASSIGNED TECHNICIAN</span>
+                  <span className="text-slate-400 font-mono text-[10px] uppercase block">ASSIGNED FIELD TECHNICIAN</span>
                   <div className="flex items-center gap-2 text-white font-bold text-sm">
                     <UserCheck className="w-4 h-4 text-cyan-400" />
                     {assignedTechnician?.name || 'Assigned Technician'}
                   </div>
-                  <p className="text-slate-400 text-[11px]">{assignedTechnician?.phone || '+1-555-0101'}</p>
+                  <p className="text-slate-400 text-[11px] font-mono">{assignedTechnician?.phone || '+1-555-0101'}</p>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
@@ -260,35 +291,58 @@ export default async function IssueDetailPage({ params }: PageProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Agent Decision Rationale */}
+              {workOrder.agentLogs && (workOrder.agentLogs as any[]).length > 0 && (
+                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs">
+                  <span className="text-cyan-400 font-mono text-[10px] uppercase tracking-wider block">
+                    Why FixProof Dispatched This Technician
+                  </span>
+                  <p className="text-slate-300 font-mono text-[11px] leading-relaxed">
+                    {(workOrder.agentLogs as any[])[0]?.details || 'Agent matched available category technician deterministically.'}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* 2nd STAGE AI VERIFICATION ENGINE DASHBOARD */}
+          {/* Controlled Tool Execution Trace Panel */}
+          {toolLogs.length > 0 && (
+            <AgentToolTrace
+              logs={toolLogs}
+              assignedTechnicianName={assignedTechnician?.name}
+              category={workOrder?.category || issue.aiCategory || 'Plumbing'}
+              severity={workOrder?.severity || issue.aiSeverity || 'Medium'}
+              confidence={confidencePercent}
+            />
+          )}
+
+          {/* SECTION 3 — REPAIR PROOF & 2ND STAGE AI VERIFICATION ENGINE */}
           {workOrder?.afterImageUrl && (
             <div className="glass-panel p-6 rounded-2xl border border-cyan-900/50 space-y-6">
               
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-2 text-cyan-300 font-mono text-xs font-bold uppercase">
                   <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                  2nd-Stage Multimodal AI Repair Verification
+                  SECTION 3: 2nd-Stage Multimodal AI Repair Verification
                 </div>
                 {latestVerification && (
                   <VerificationResultBadge result={latestVerification.result as VerificationResult} />
                 )}
               </div>
 
-              {/* Before vs After Side-by-Side Comparison */}
+              {/* Before vs After Side-by-Side Visual Comparison Panel */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-mono text-slate-400 uppercase block">BEFORE REPAIR (ORIGINAL)</span>
+                  <span className="text-xs font-mono text-slate-400 uppercase block font-bold">BEFORE REPAIR (ORIGINAL INCIDENT)</span>
                   <div className="relative rounded-xl overflow-hidden border border-slate-800 h-48 bg-slate-950">
-                    <img src={issue.beforeImageUrl} alt="Before repair" className="w-full h-full object-cover" />
+                    <SafeImage src={issue.beforeImageUrl} alt="Before repair" fallbackLabel="Before Photo" className="w-full h-full object-cover" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-mono text-emerald-400 uppercase font-bold block">AFTER REPAIR (TECHNICIAN PROOF)</span>
+                  <span className="text-xs font-mono text-emerald-400 uppercase font-bold block">AFTER REPAIR (TECHNICIAN PROOF)</span>
                   <div className="relative rounded-xl overflow-hidden border border-emerald-800 h-48 bg-slate-950">
-                    <img src={workOrder.afterImageUrl} alt="After repair" className="w-full h-full object-cover" />
+                    <SafeImage src={workOrder.afterImageUrl} alt="After repair" fallbackLabel="After Photo" className="w-full h-full object-cover" />
                   </div>
                 </div>
               </div>
@@ -335,7 +389,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
                   {/* Objective Reasoning & Evidence Assessment */}
                   <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
                     <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block">
-                      AI Verification Reasoning
+                      AI Verification Rationale
                     </span>
                     <p className="text-xs text-slate-200 leading-relaxed">
                       {latestVerification.reasoning}
@@ -348,7 +402,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
                     )}
                   </div>
 
-                  {/* Remaining Issues List (if FAIL) */}
+                  {/* Remaining Unresolved Defects (if FAIL) */}
                   {Array.isArray(detectedInfo.remainingIssues) && detectedInfo.remainingIssues.length > 0 && (
                     <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-800/50 space-y-2">
                       <span className="text-[10px] font-mono text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -377,25 +431,20 @@ export default async function IssueDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {/* Inconclusive Supervisor Review Controls */}
+              {/* SECTION 4 — RECOVERY: Inconclusive Supervisor Review Controls */}
               {latestVerification?.result === 'INCONCLUSIVE' && (
                 <SupervisorVerificationReview issueId={issue.id} />
               )}
             </div>
           )}
 
-          {/* Controlled Tool Execution Trace Panel */}
-          {toolLogs.length > 0 && (
-            <AgentToolTrace logs={toolLogs} />
-          )}
-
-          {/* System Audit Timeline Panel */}
+          {/* Chronological System Audit Timeline */}
           <SystemAuditTimeline events={auditEvents} />
 
           {/* Verification History Audit Trail */}
           {verificationHistory.length > 0 && (
             <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
+              <div className="flex items-center gap-2 text-white font-bold text-sm font-mono">
                 <History className="w-4 h-4 text-cyan-400" />
                 Verification History Audit Trail ({verificationHistory.length} Attempt{verificationHistory.length > 1 ? 's' : ''})
               </div>
@@ -425,7 +474,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
 
         </div>
 
-        {/* Right Column (1 Col): AI Perception, Agent Routing, & Timeline Sidebar */}
+        {/* Right Column (1 Col): AI Perception & Dispatch Controls */}
         <div className="space-y-6">
           
           {/* AI Perception Engine Card */}
@@ -541,80 +590,6 @@ export default async function IssueDetailPage({ params }: PageProps) {
               )}
             </div>
           )}
-
-          {/* Closed-Loop Lifecycle Timeline */}
-          <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4">
-            <h3 className="font-bold text-white text-sm flex items-center gap-2">
-              <Activity className="w-4 h-4 text-cyan-400" />
-              Closed-Loop Lifecycle
-            </h3>
-
-            <div className="relative pl-6 space-y-5 border-l border-slate-800 text-xs">
-              <div className="relative">
-                <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-cyan-500 border-2 border-slate-950"></div>
-                <div>
-                  <h4 className="font-bold text-cyan-300">1. Issue Reported</h4>
-                  <span className="text-[10px] font-mono text-slate-500 block">
-                    {formatTimeString(issue.createdAt)}
-                  </span>
-                </div>
-              </div>
-
-              <div className={`relative ${hasAnalyzed ? '' : 'opacity-50'}`}>
-                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${hasAnalyzed ? 'bg-indigo-500' : 'bg-slate-800'}`}></div>
-                <div>
-                  <h4 className={`font-medium ${hasAnalyzed ? 'text-indigo-300 font-bold' : 'text-slate-400'}`}>
-                    2. AI Perception Analysis
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {hasAnalyzed ? `${issue.aiCategory?.toUpperCase()} (${confidencePercent}% confidence)` : 'Pending'}
-                  </p>
-                </div>
-              </div>
-
-              <div className={`relative ${isAssignedOrBeyond ? '' : 'opacity-50'}`}>
-                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${isAssignedOrBeyond ? 'bg-blue-500' : 'bg-slate-800'}`}></div>
-                <div>
-                  <h4 className={`font-medium ${isAssignedOrBeyond ? 'text-blue-300 font-bold' : 'text-slate-400'}`}>
-                    3. Work Order Assigned
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {workOrder ? `Technician: ${assignedTechnician?.name || 'Assigned'}` : 'Pending Agent Routing'}
-                  </p>
-                </div>
-              </div>
-
-              <div className={`relative ${workOrder?.afterImageUrl ? '' : 'opacity-50'}`}>
-                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${workOrder?.afterImageUrl ? 'bg-purple-500' : 'bg-slate-800'}`}></div>
-                <div>
-                  <h4 className={`font-medium ${workOrder?.afterImageUrl ? 'text-purple-300 font-bold' : 'text-slate-400'}`}>
-                    4. Repair Submitted
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {workOrder?.afterImageUrl ? 'After-repair photo uploaded' : 'Pending Technician Work'}
-                  </p>
-                </div>
-              </div>
-
-              <div className={`relative ${latestVerification ? '' : 'opacity-50'}`}>
-                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${
-                  isVerifiedOrClosed ? 'bg-emerald-500' : isReopened ? 'bg-rose-500' : latestVerification ? 'bg-yellow-500' : 'bg-slate-800'
-                }`}></div>
-                <div>
-                  <h4 className={`font-medium ${
-                    isVerifiedOrClosed ? 'text-emerald-300 font-bold' : isReopened ? 'text-rose-300 font-bold' : 'text-slate-400'
-                  }`}>
-                    5. AI Repair Verification
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {latestVerification 
-                      ? `${latestVerification.result} (${Math.round((latestVerification.confidence ?? 0) * 100)}% confidence)`
-                      : 'Pending Verification Engine'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
 
         </div>
 

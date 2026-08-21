@@ -207,13 +207,14 @@ export async function updateIssueStatus(issueId: string, status: WorkOrderStatus
 
 export async function getAllIssues() {
   if (!isDatabaseConfigured()) {
-    return memoryIssuesStore;
+    return memoryIssuesStore.filter(i => !i.title?.startsWith('EVAL:'));
   }
   try {
-    return await db.select().from(schema.issues).orderBy(desc(schema.issues.createdAt));
+    const results = await db.select().from(schema.issues).orderBy(desc(schema.issues.createdAt));
+    return results.filter(i => !i.title?.startsWith('EVAL:'));
   } catch (err) {
     console.warn('⚠️ Neon DB query failed, using memory fallback:', err);
-    return memoryIssuesStore;
+    return memoryIssuesStore.filter(i => !i.title?.startsWith('EVAL:'));
   }
 }
 
@@ -364,12 +365,13 @@ export async function updateWorkOrderStatusRecord(
 
 export async function getAllWorkOrders() {
   if (!isDatabaseConfigured()) {
-    return memoryWorkOrdersStore;
+    return memoryWorkOrdersStore.filter(w => !w.problem?.startsWith('EVAL:'));
   }
   try {
-    return await db.select().from(schema.workOrders).orderBy(desc(schema.workOrders.createdAt));
+    const results = await db.select().from(schema.workOrders).orderBy(desc(schema.workOrders.createdAt));
+    return results.filter(w => !w.problem?.startsWith('EVAL:'));
   } catch (err) {
-    return memoryWorkOrdersStore;
+    return memoryWorkOrdersStore.filter(w => !w.problem?.startsWith('EVAL:'));
   }
 }
 
@@ -387,16 +389,17 @@ export async function getWorkOrderById(id: string) {
 
 export async function getWorkOrdersByTechnicianId(technicianId: string) {
   if (!isDatabaseConfigured()) {
-    return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId);
+    return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId && !w.problem?.startsWith('EVAL:'));
   }
   try {
-    return await db
+    const results = await db
       .select()
       .from(schema.workOrders)
       .where(eq(schema.workOrders.technicianId, technicianId))
       .orderBy(desc(schema.workOrders.createdAt));
+    return results.filter(w => !w.problem?.startsWith('EVAL:'));
   } catch (err) {
-    return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId);
+    return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId && !w.problem?.startsWith('EVAL:'));
   }
 }
 

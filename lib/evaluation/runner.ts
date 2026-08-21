@@ -1,6 +1,7 @@
 import { EVALUATION_CASES, EvaluationCaseDef } from './cases';
 import { validateStatusTransition } from '@/lib/agent/stateMachine';
 import { sanitizeServerError } from '@/lib/errors';
+import { neon } from '@neondatabase/serverless';
 import { 
   createIssue, 
   updateIssuePerception, 
@@ -255,6 +256,20 @@ export async function runFullEvaluationSuite(): Promise<EvaluationSuiteSummary> 
   for (const caseDef of EVALUATION_CASES) {
     const res = await runEvaluationCase(caseDef);
     caseResults.push(res);
+  }
+
+  // Cleanup temporary benchmark EVAL records from Neon DB after evaluation run
+  const rawUrl = process.env.DATABASE_URL || '';
+  const cleanUrl = rawUrl.replace(/[\?&]channel_binding=[^&]+/g, '');
+  if (cleanUrl && !cleanUrl.includes('placeholder')) {
+    try {
+      const sql = neon(cleanUrl);
+      await sql`DELETE FROM verification_results WHERE issue_id IN (SELECT id FROM issues WHERE title LIKE 'EVAL:%')`;
+      await sql`DELETE FROM work_orders WHERE issue_id IN (SELECT id FROM issues WHERE title LIKE 'EVAL:%')`;
+      await sql`DELETE FROM issues WHERE title LIKE 'EVAL:%'`;
+    } catch (err) {
+      // Non-blocking cleanup
+    }
   }
 
   const durationMs = Date.now() - startTime;

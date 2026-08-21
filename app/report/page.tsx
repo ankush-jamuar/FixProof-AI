@@ -12,7 +12,9 @@ import {
   CheckCircle2, 
   Loader2, 
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  Sparkles,
+  Cpu
 } from 'lucide-react';
 import { MAX_FILE_SIZE, ALLOWED_IMAGE_TYPES } from '@/lib/validation/schemas';
 
@@ -57,14 +59,14 @@ export default function ReportPage() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    // Basic Client-side check
-    if (!description.trim() || description.trim().length < 5) {
-      setErrorMessage('Please provide a detailed description (at least 5 characters).');
+    // Client-side validation
+    if (!location.trim() || location.trim().length < 2) {
+      setErrorMessage('Please specify the problem location (e.g. Block C, Room 214).');
       return;
     }
 
-    if (!location.trim() || location.trim().length < 2) {
-      setErrorMessage('Please specify the problem location (e.g. Block C, Room 214).');
+    if (!description.trim() || description.trim().length < 5) {
+      setErrorMessage('Please provide a detailed description (at least 5 characters).');
       return;
     }
 
@@ -89,13 +91,13 @@ export default function ReportPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to submit issue report.');
+        throw new Error(data.error?.message || 'Failed to submit issue report.');
       }
 
-      setSuccessMessage('Issue reported successfully! Redirecting to issue page...');
+      setSuccessMessage('Incident recorded! Opening Issue Command Center...');
       setTimeout(() => {
         router.push(`/issues/${data.issue.id}`);
-      }, 1200);
+      }, 1000);
     } catch (err: any) {
       setErrorMessage(err.message || 'An error occurred while uploading. Please try again.');
     } finally {
@@ -110,14 +112,30 @@ export default function ReportPage() {
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 text-xs font-mono">
           <ShieldAlert className="w-3.5 h-3.5 text-cyan-400" />
-          CAMPUS MAINTENANCE DISPATCH
+          AI-ASSISTED INCIDENT INTAKE
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight text-white">
-          Report Maintenance Issue
+          Report Campus Maintenance Incident
         </h1>
         <p className="text-slate-400 text-sm">
-          Submit photo evidence, location, and description. The system will store raw evidence before routing to AI perception.
+          Upload visual evidence and location details. FixProof AI will parse the photo, classify problem severity, and prepare autonomous dispatch.
         </p>
+      </div>
+
+      {/* Guided Intake Progress Indicator */}
+      <div className="grid grid-cols-3 gap-3 font-mono text-xs">
+        <div className={`p-3 rounded-xl border flex items-center gap-2 ${location ? 'bg-cyan-950/60 border-cyan-700 text-cyan-300' : 'bg-slate-900/60 border-slate-800 text-slate-500'}`}>
+          <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center font-bold text-[10px]">1</span>
+          <span className="font-bold truncate">1. Location</span>
+        </div>
+        <div className={`p-3 rounded-xl border flex items-center gap-2 ${selectedFile ? 'bg-cyan-950/60 border-cyan-700 text-cyan-300' : 'bg-slate-900/60 border-slate-800 text-slate-500'}`}>
+          <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center font-bold text-[10px]">2</span>
+          <span className="font-bold truncate">2. Visual Proof</span>
+        </div>
+        <div className={`p-3 rounded-xl border flex items-center gap-2 ${isSubmitting ? 'bg-indigo-950/60 border-indigo-700 text-indigo-300 animate-pulse' : 'bg-slate-900/60 border-slate-800 text-slate-500'}`}>
+          <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center font-bold text-[10px]">3</span>
+          <span className="font-bold truncate">3. AI Parsing</span>
+        </div>
       </div>
 
       {/* Form Card */}
@@ -141,39 +159,39 @@ export default function ReportPage() {
 
         {/* Location Input */}
         <div className="space-y-2">
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
             <MapPin className="w-4 h-4 text-cyan-400" />
             Location <span className="text-cyan-400">*</span>
           </label>
           <input
             type="text"
-            placeholder="e.g. Block C, Floor 2, Outside Room 214"
+            placeholder="e.g. Science Building, Floor 2, Cafeteria Restroom"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             disabled={isSubmitting}
-            className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm transition-all"
+            className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm transition-all font-mono"
           />
         </div>
 
         {/* Description Textarea */}
         <div className="space-y-2">
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
             <FileText className="w-4 h-4 text-cyan-400" />
             Problem Description <span className="text-cyan-400">*</span>
           </label>
           <textarea
             rows={4}
-            placeholder="Describe the issue in detail (e.g. Water leaking heavily from the pipe joint underneath the sink)."
+            placeholder="Describe the issue in detail (e.g. Water pipe burst under main sink emitting steady leak)."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={isSubmitting}
-            className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm transition-all resize-none"
+            className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm transition-all resize-none font-mono"
           />
         </div>
 
         {/* Photo Evidence Dropzone */}
         <div className="space-y-2">
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 font-mono">
             <ImageIcon className="w-4 h-4 text-cyan-400" />
             Photo Evidence <span className="text-cyan-400">*</span>
           </label>
@@ -195,10 +213,10 @@ export default function ReportPage() {
                 <UploadCloud className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-200 group-hover:text-cyan-300 transition-colors">
+                <p className="text-sm font-medium text-slate-200 group-hover:text-cyan-300 transition-colors font-mono">
                   Click to upload issue photograph
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1 font-mono">
                   JPG, PNG, WEBP, HEIC up to 10 MB
                 </p>
               </div>
@@ -239,16 +257,16 @@ export default function ReportPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-semibold text-sm shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-semibold text-sm shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center gap-2 font-mono"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-cyan-200" />
-                Uploading Evidence & Submitting Issue...
+                Uploading Evidence & Initializing AI Pipeline...
               </>
             ) : (
               <>
-                Submit Maintenance Report
+                Submit Incident Report
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

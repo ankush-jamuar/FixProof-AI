@@ -12,6 +12,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { WorkOrderStatus } from '@/types/domain';
+import SafeImage from '@/components/ui/SafeImage';
 
 export const revalidate = 0; // Server-rendered on every request
 
@@ -113,9 +114,10 @@ export default async function IssuesPage() {
               <div>
                 {/* Evidence Thumbnail */}
                 <div className="relative h-44 w-full bg-slate-950 overflow-hidden">
-                  <img
+                  <SafeImage
                     src={issue.beforeImageUrl}
                     alt={issue.title}
+                    fallbackLabel="Evidence Photo"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute top-3 right-3">

@@ -1,19 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ShieldCheck, AlertCircle, Wrench, Eye, CheckCircle2, BarChart2, Cpu } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ShieldCheck, AlertCircle, Wrench, CheckCircle2, LayoutDashboard, Sparkles, ArrowRightLeft } from 'lucide-react';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const isTechnicianView = pathname?.startsWith('/technician');
 
   const navLinks = [
-    { href: '/', label: 'Overview', icon: Cpu },
-    { href: '/report', label: 'Report Issue', icon: AlertCircle },
-    { href: '/issues', label: 'Issues & Agent', icon: ShieldCheck },
-    { href: '/technician', label: 'Technician Portal', icon: Wrench },
-    { href: '/verification', label: 'AI Verification', icon: Eye },
-    { href: '/evaluation', label: 'Eval Harness', icon: BarChart2 },
+    { href: '/supervisor', label: 'Supervisor Operations', icon: LayoutDashboard },
+    { href: '/issues', label: 'Issues & Agent Queue', icon: ShieldCheck },
+    { href: '/technician', label: 'Technician Field Portal', icon: Wrench },
+    { href: '/report', label: 'Report Incident', icon: AlertCircle },
   ];
 
   return (
@@ -28,14 +29,16 @@ export default function Navbar() {
             </div>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight text-white flex items-center gap-1.5">
+            <span className="font-bold text-lg tracking-tight text-white flex items-center gap-1.5 font-mono">
               FIXPROOF <span className="text-cyan-400 text-xs px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/60 font-mono">AI</span>
             </span>
-            <span className="text-[10px] text-slate-400 tracking-wider uppercase font-medium">Closed-Loop Maintenance System</span>
+            <span className="text-[10px] text-slate-400 tracking-wider uppercase font-medium">
+              Closed-Loop Maintenance System
+            </span>
           </div>
         </Link>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Links */}
         <nav className="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800/60">
           {navLinks.map((link) => {
             const Icon = link.icon;
@@ -58,14 +61,32 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* System Status Pill */}
+        {/* Quick Role Switcher Pill for Demo Evaluators */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 font-mono">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            SYSTEM OPERATIONAL
+          <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
+            <Link
+              href="/supervisor"
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
+                !isTechnicianView
+                  ? 'bg-indigo-950 text-indigo-300 border border-indigo-700/80 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
+              Supervisor
+            </Link>
+
+            <Link
+              href="/technician"
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
+                isTechnicianView
+                  ? 'bg-cyan-950 text-cyan-300 border border-cyan-700/80 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Wrench className="w-3.5 h-3.5 text-cyan-400" />
+              Technician
+            </Link>
           </div>
         </div>
 

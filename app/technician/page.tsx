@@ -1,129 +1,147 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { 
-  Wrench, 
-  MapPin, 
-  Clock, 
-  UploadCloud, 
-  CheckCircle2, 
-  Loader2, 
-  ImageIcon, 
-  Play, 
-  AlertCircle, 
-  Eye,
-  UserCheck,
-  ShieldCheck,
-  RefreshCw
+import { useState, useEffect } from 'react';
+import {
+  Wrench,
+  MapPin,
+  CheckCircle2,
+  Loader2,
+  Play,
+  Camera,
+  Phone,
+  ShieldAlert,
+  Upload,
+  Clock
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
-import { WorkOrderStatus, IssueCategory, IssueSeverity } from '@/types/domain';
+import SafeImage from '@/components/ui/SafeImage';
+import { validateImageFile } from '@/lib/validation/schemas';
 
-interface WorkOrderJoined {
-  id: string;
-  issueId: string;
-  technicianId?: string;
-  category: IssueCategory;
-  problem: string;
-  severity: IssueSeverity;
-  location: string;
-  description: string;
-  status: WorkOrderStatus;
-  afterImageUrl?: string;
-  technicianNotes?: string;
-  assignedAt?: string;
-  startedAt?: string;
-  completedAt?: string;
-  createdAt: string;
-  issue?: {
-    beforeImageUrl: string;
-    title: string;
-  };
-}
-
-interface TechnicianOption {
+interface TechnicianData {
   id: string;
   name: string;
-  category: IssueCategory;
-  phone?: string;
+  category: string;
+  isAvailable: boolean;
+  phone: string;
+}
+
+interface WorkOrderJob {
+  id: string;
+  issueId: string;
+  category: string;
+  problem: string;
+  severity: string;
+  location: string;
+  description: string;
+  status: string;
+  beforeImageUrl?: string;
+  afterImageUrl?: string;
+  technicianNotes?: string;
+  createdAt: string;
 }
 
 export default function TechnicianPortalPage() {
-  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
-  const [selectedTechId, setSelectedTechId] = useState<string>('');
-  const [workOrders, setWorkOrders] = useState<WorkOrderJoined[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Repair submission form state
-  const [activeWOId, setActiveWOId] = useState<string | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [techNotes, setTechNotes] = useState('');
-
+  const [technicians, setTechnicians] = useState<TechnicianData[]>([]);
+  const [selectedTechId, setSelectedTechId] = useState<string>('tech-1');
+  const [workOrders, setWorkOrders] = useState<WorkOrderJob[]>([]);
+  const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // File upload state per work order
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
+  const [filePreviews, setFilePreviews] = useState<Record<string, string>>({});
+  const [techNotes, setTechNotes] = useState<Record<string, string>>({});
+
   const [toastMessage, setToastMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch initial technicians & work orders
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setIsLoading(true);
+  const fetchTechnicianPortalData = async (techId: string) => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/technician/data');
-      if (res.ok) {
-        const data = await res.json();
+      const res = await fetch(`/api/technician/data?techId=${techId}`);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
         setTechnicians(data.technicians || []);
-        if (data.technicians && data.technicians.length > 0 && !selectedTechId) {
-          setSelectedTechId(data.technicians[0].id);
-        }
         setWorkOrders(data.workOrders || []);
+      } else {
+        throw new Error(data.error?.message || 'Failed to load technician portal data.');
       }
-    } catch (err) {
-      console.error('Failed to fetch technician data:', err);
+    } catch (err: any) {
+      setToastMessage({
+        type: 'error',
+        text: err.message || 'Failed to load field jobs.',
+      });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleStartWork = async (woId: string) => {
-    setActionLoadingId(woId);
+  useEffect(() => {
+    fetchTechnicianPortalData(selectedTechId);
+  }, [selectedTechId]);
+
+  const handleStartWork = async (workOrderId: string) => {
+    setActionLoadingId(workOrderId);
     setToastMessage(null);
 
     try {
-      const res = await fetch(`/api/work-orders/${woId}/start`, { method: 'POST' });
+      const res = await fetch(`/api/work-orders/${workOrderId}/start`, { method: 'POST' });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error?.message || 'Failed to start work order.');
+        throw new Error(data.error?.message || 'Failed to start repair job.');
       }
 
-      setToastMessage({ type: 'success', text: 'Work started! Status updated to IN_PROGRESS.' });
-      fetchData();
+      setToastMessage({
+        type: 'success',
+        text: 'Repair work started! Status updated to IN_PROGRESS.',
+      });
+      fetchTechnicianPortalData(selectedTechId);
     } catch (err: any) {
-      setToastMessage({ type: 'error', text: err.message || 'Failed to start work order.' });
+      setToastMessage({
+        type: 'error',
+        text: err.message || 'Failed to start repair work.',
+      });
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const handleCompleteWork = async (woId: string) => {
-    if (!uploadFile) {
-      setToastMessage({ type: 'error', text: 'An after-repair photograph is required as evidence.' });
+  const handleFileSelect = (workOrderId: string, file: File | null) => {
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setToastMessage({ type: 'error', text: validation.error || 'Invalid evidence photo format.' });
       return;
     }
 
-    setActionLoadingId(woId);
+    setSelectedFiles((prev) => ({ ...prev, [workOrderId]: file }));
+
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFilePreviews((prev) => ({ ...prev, [workOrderId]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmitRepair = async (workOrderId: string) => {
+    const file = selectedFiles[workOrderId];
+    if (!file) {
+      setToastMessage({ type: 'error', text: 'An after-repair photograph is required as proof of completion.' });
+      return;
+    }
+
+    setActionLoadingId(workOrderId);
     setToastMessage(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('technicianNotes', techNotes);
+      formData.append('file', file);
+      formData.append('technicianNotes', techNotes[workOrderId] || '');
 
-      const res = await fetch(`/api/work-orders/${woId}/complete`, {
+      const res = await fetch(`/api/work-orders/${workOrderId}/complete`, {
         method: 'POST',
         body: formData,
       });
@@ -134,71 +152,93 @@ export default function TechnicianPortalPage() {
         throw new Error(data.error?.message || 'Failed to submit repair proof.');
       }
 
-      setToastMessage({ type: 'success', text: 'Repair proof uploaded! Status updated to PENDING_VERIFICATION.' });
-      setUploadFile(null);
-      setPreviewUrl(null);
-      setTechNotes('');
-      setActiveWOId(null);
-      fetchData();
+      setToastMessage({
+        type: 'success',
+        text: 'After-repair proof uploaded successfully! Awaiting 2nd-stage AI verification.',
+      });
+
+      // Clear local file state
+      setSelectedFiles((prev) => {
+        const next = { ...prev };
+        delete next[workOrderId];
+        return next;
+      });
+
+      fetchTechnicianPortalData(selectedTechId);
     } catch (err: any) {
-      setToastMessage({ type: 'error', text: err.message || 'Failed to submit repair proof.' });
+      setToastMessage({
+        type: 'error',
+        text: err.message || 'Failed to upload repair proof.',
+      });
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const handleFileChange = (file: File | null) => {
-    if (!file) {
-      setUploadFile(null);
-      setPreviewUrl(null);
-      return;
-    }
-    setUploadFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-  };
-
-  const currentTech = technicians.find(t => t.id === selectedTechId);
-  const assignedWorkOrders = workOrders.filter(w => w.technicianId === selectedTechId || !w.technicianId);
+  const currentTech = technicians.find((t) => t.id === selectedTechId);
 
   return (
-    <div className="space-y-8 py-4">
+    <div className="max-w-4xl mx-auto space-y-6 py-4">
       
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-700/60 text-amber-300 text-xs font-mono">
-            <Wrench className="w-3.5 h-3.5 text-amber-400" />
-            FIELD TECHNICIAN WORKFORCE
+      {/* Field Portal Header */}
+      <div className="glass-panel p-6 rounded-2xl border border-cyan-900/50 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 text-xs font-mono">
+              <Wrench className="w-3.5 h-3.5 text-cyan-400" />
+              TECHNICIAN FIELD PORTAL
+            </div>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">
+              My Field Dispatch Jobs
+            </h1>
+            <p className="text-slate-400 text-xs">
+              Mobile-optimized portal for campus technicians to inspect issues, record repairs, and upload after-repair evidence.
+            </p>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Technician Repair Portal
-          </h1>
-          <p className="text-slate-400 text-sm">
-            View assigned work orders, accept jobs, and submit photo proof of completed repairs.
-          </p>
+
+          {/* Technician Role Selector (Demo Environment) */}
+          <div className="space-y-1 shrink-0">
+            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+              DEMO TECHNICIAN SELECTOR
+            </span>
+            <select
+              value={selectedTechId}
+              onChange={(e) => setSelectedTechId(e.target.value)}
+              className="bg-slate-900 border border-slate-700 text-white font-mono text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500"
+            >
+              {technicians.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.category.toUpperCase()})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* DEMO_MODE Technician Selector */}
-        <div className="glass-panel p-3 rounded-xl border border-slate-800 space-y-1.5 shrink-0 min-w-[280px]">
-          <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-            Viewing as Technician:
-          </label>
-          <select
-            value={selectedTechId}
-            onChange={(e) => setSelectedTechId(e.target.value)}
-            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-medium text-xs focus:outline-none focus:border-amber-500"
-          >
-            {technicians.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.category.toUpperCase()})
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Selected Tech Card */}
+        {currentTech && (
+          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-800 flex items-center justify-center font-bold text-cyan-400 font-mono">
+                {currentTech.name.charAt(0)}
+              </div>
+              <div>
+                <span className="font-bold text-white block">{currentTech.name}</span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Category: <span className="text-cyan-300 uppercase font-bold">{currentTech.category}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+              <Phone className="w-3.5 h-3.5 text-slate-500" />
+              <span>{currentTech.phone}</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Notification Toast */}
+      {/* Toast Notification Banner */}
       {toastMessage && (
         <Toast
           type={toastMessage.type}
@@ -207,209 +247,233 @@ export default function TechnicianPortalPage() {
         />
       )}
 
-      {/* Main Jobs Section */}
-      {isLoading ? (
-        <div className="p-12 text-center text-slate-400 text-xs space-y-2">
-          <Loader2 className="w-6 h-6 animate-spin text-amber-400 mx-auto" />
-          <span>Loading assigned work orders...</span>
+      {/* Jobs List */}
+      {loading ? (
+        <div className="p-12 text-center glass-panel rounded-2xl border border-slate-800 space-y-3">
+          <Loader2 className="w-8 h-8 text-cyan-400 animate-spin mx-auto" />
+          <span className="text-xs font-mono text-slate-400 block">Loading field dispatch tasks...</span>
         </div>
-      ) : assignedWorkOrders.length === 0 ? (
-        <div className="glass-panel p-12 rounded-2xl border border-slate-800 text-center space-y-3">
-          <ShieldCheck className="w-12 h-12 text-slate-500 mx-auto" />
-          <h3 className="text-lg font-semibold text-white">No Pending Work Orders</h3>
-          <p className="text-slate-400 text-xs max-w-sm mx-auto">
-            Technician {currentTech?.name || ''} has no active assigned jobs right now.
-          </p>
+      ) : workOrders.length === 0 ? (
+        <div className="p-12 text-center glass-panel rounded-2xl border border-slate-800 space-y-3">
+          <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+          <h3 className="text-base font-bold text-white">All Work Orders Completed</h3>
+          <p className="text-slate-400 text-xs">No pending field jobs assigned to {currentTech?.name}.</p>
         </div>
       ) : (
         <div className="space-y-6">
-          {assignedWorkOrders.map((wo) => {
+          {workOrders.map((wo) => {
             const isAssigned = wo.status === 'ASSIGNED';
-            const isReopened = wo.status === 'REOPENED';
             const isInProgress = wo.status === 'IN_PROGRESS';
             const isPendingVerification = wo.status === 'PENDING_VERIFICATION';
+            const isReopened = wo.status === 'REOPENED';
+            const isVerifiedOrClosed = ['VERIFIED', 'CLOSED'].includes(wo.status);
+
+            const isCurrentActionLoading = actionLoadingId === wo.id;
+            const previewUrl = filePreviews[wo.id];
 
             return (
               <div
                 key={wo.id}
-                className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5"
+                className={`glass-panel rounded-2xl border transition-all space-y-5 p-6 ${
+                  isReopened
+                    ? 'border-rose-800/80 bg-rose-950/10 shadow-lg shadow-rose-950/20'
+                    : isVerifiedOrClosed
+                    ? 'border-emerald-900/60 bg-emerald-950/10'
+                    : 'border-slate-800'
+                }`}
               >
-                {/* Status & Category Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 rounded-md text-xs font-mono font-bold uppercase bg-amber-950 text-amber-300 border border-amber-700/60">
-                      {wo.category}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-md text-xs font-mono uppercase bg-slate-900 text-slate-300 border border-slate-700">
-                      {wo.severity} severity
-                    </span>
-                  </div>
-
-                  <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold border ${
-                    isAssigned
-                      ? 'bg-blue-950 text-blue-300 border-blue-700'
-                      : isReopened
-                      ? 'bg-rose-950 text-rose-300 border-rose-700 shadow-sm shadow-rose-500/20'
-                      : isInProgress
-                      ? 'bg-purple-950 text-purple-300 border-purple-700'
-                      : 'bg-yellow-950 text-yellow-300 border-yellow-700'
-                  }`}>
-                    {wo.status}
-                  </span>
-                </div>
 
                 {/* Reopened Alert Banner */}
                 {isReopened && (
-                  <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1">
-                    <div className="flex items-center gap-2 font-bold">
-                      <AlertCircle className="w-4 h-4 text-rose-400" />
-                      REPAIR VERIFICATION FAILED &mdash; REPAIR REOPENED
+                  <div className="p-4 rounded-xl bg-rose-950/50 border border-rose-700/80 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 font-bold text-rose-300 font-mono">
+                      <ShieldAlert className="w-4 h-4 text-rose-400" />
+                      AI VERIFICATION FAILED — REPAIR REOPENED FOR RETRY
                     </div>
-                    <p className="text-[11px] text-rose-200/90 leading-relaxed">
-                      AI Verification detected remaining unaddressed defect or insufficient proof in previous attempt. Please re-inspect, complete repair, and upload new evidence photo.
+                    <p className="text-rose-200/90 text-[11px] leading-relaxed">
+                      The 2nd-stage AI repair verification detected remaining unresolved defects in the previous repair proof. Please inspect the issue again, complete the necessary repairs, and upload fresh photo evidence.
                     </p>
                   </div>
                 )}
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
-                  {/* Left (1 Col): Original Before Image */}
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
-                      Original Reported Evidence
-                    </span>
-                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 h-48">
-                      {wo.issue?.beforeImageUrl ? (
-                        <img
-                          src={wo.issue.beforeImageUrl}
-                          alt={wo.problem}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-slate-500 text-xs">
-                          No Before Image
-                        </div>
-                      )}
+                {/* Job Card Header */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-cyan-400">WO #{wo.id.slice(0, 8)}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-slate-900 text-indigo-300 border border-slate-800">
+                        {wo.category}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-rose-950 text-rose-300 border border-rose-800 font-bold">
+                        {wo.severity} severity
+                      </span>
                     </div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">{wo.problem}</h3>
                   </div>
 
-                  {/* Middle (2 Cols): Problem & Action Controls */}
-                  <div className="md:col-span-2 space-y-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-white tracking-tight">{wo.problem}</h3>
-                      <div className="flex items-center gap-2 text-xs text-cyan-300 font-medium mt-1">
-                        <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>{wo.location}</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase border ${
+                    isVerifiedOrClosed
+                      ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                      : isReopened
+                      ? 'bg-rose-950 text-rose-300 border-rose-600'
+                      : isInProgress
+                      ? 'bg-cyan-950 text-cyan-300 border-cyan-600'
+                      : 'bg-indigo-950 text-indigo-300 border-indigo-700'
+                  }`}>
+                    STATUS: {wo.status}
+                  </span>
+                </div>
+
+                {/* Location & Original User Description */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  
+                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center gap-2 text-cyan-300 font-medium">
+                      <MapPin className="w-4 h-4 text-cyan-400" />
+                      <span>{wo.location}</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      {wo.description}
+                    </p>
+                  </div>
+
+                  {/* Before Evidence Thumbnail */}
+                  {wo.beforeImageUrl && (
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <span className="text-xs font-mono text-slate-400 uppercase block font-bold">BEFORE REPAIR (REPORTED ISSUE)</span>
+                      <div className="relative rounded-lg overflow-hidden h-36 bg-slate-950 border border-slate-800">
+                        <SafeImage src={wo.beforeImageUrl} alt="Original issue" fallbackLabel="Before Photo" className="w-full h-full object-cover" />
                       </div>
                     </div>
-
-                    <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 leading-relaxed">
-                      {wo.description}
-                    </div>
-
-                    {/* Action Controls */}
-                    <div className="pt-2">
-                      {(isAssigned || isReopened) && (
-                        <button
-                          onClick={() => handleStartWork(wo.id)}
-                          disabled={actionLoadingId === wo.id}
-                          className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 hover:scale-[1.01] transition-all flex items-center gap-2"
-                        >
-                          {actionLoadingId === wo.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : isReopened ? (
-                            <RefreshCw className="w-4 h-4 text-cyan-300" />
-                          ) : (
-                            <Play className="w-4 h-4" />
-                          )}
-                          {isReopened ? 'Start Repair Work Again' : 'Start Repair Work'}
-                        </button>
-                      )}
-
-                      {isInProgress && (
-                        <div className="space-y-4 p-4 rounded-xl bg-slate-950/80 border border-purple-900/40">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
-                              <UploadCloud className="w-4 h-4 text-purple-400" />
-                              Submit Repair Evidence Photo
-                            </span>
-                          </div>
-
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            accept="image/*"
-                            onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-                            className="hidden"
-                          />
-
-                          {!previewUrl ? (
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="w-full py-3 border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-xl text-center text-xs text-slate-400 hover:text-purple-300 bg-slate-900/50 hover:bg-slate-900 transition-all flex items-center justify-center gap-2"
-                            >
-                              <ImageIcon className="w-4 h-4" />
-                              Upload After-Repair Photo (Required)
-                            </button>
-                          ) : (
-                            <div className="relative rounded-lg overflow-hidden border border-purple-700/60 h-40">
-                              <img src={previewUrl} alt="Repair preview" className="w-full h-full object-cover" />
-                              <button
-                                type="button"
-                                onClick={() => handleFileChange(null)}
-                                className="absolute top-2 right-2 px-2 py-1 bg-slate-950/80 text-rose-300 text-[10px] rounded border border-rose-800"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          )}
-
-                          <input
-                            type="text"
-                            placeholder="Optional repair notes (e.g. Replaced rubber gasket and sealed joint)."
-                            value={techNotes}
-                            onChange={(e) => setTechNotes(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-purple-500"
-                          />
-
-                          <button
-                            onClick={() => handleCompleteWork(wo.id)}
-                            disabled={actionLoadingId === wo.id || !uploadFile}
-                            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center gap-2"
-                          >
-                            {actionLoadingId === wo.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="w-4 h-4" />
-                            )}
-                            Submit Completed Repair & Evidence
-                          </button>
-                        </div>
-                      )}
-
-                      {isPendingVerification && (
-                        <div className="p-4 rounded-xl bg-yellow-950/30 border border-yellow-700/40 text-yellow-300 text-xs space-y-2">
-                          <div className="flex items-center gap-2 font-bold">
-                            <Eye className="w-4 h-4 text-yellow-400" />
-                            Pending AI Verification
-                          </div>
-                          <p className="text-slate-300 text-[11px]">
-                            Repair evidence submitted! The 2nd-stage AI Verification Engine will inspect before vs after photos.
-                          </p>
-                          {wo.afterImageUrl && (
-                            <div className="relative rounded-lg overflow-hidden border border-yellow-800 h-36 mt-2">
-                              <img src={wo.afterImageUrl} alt="Submitted repair proof" className="w-full h-full object-cover" />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
+                  )}
 
                 </div>
+
+                {/* Field Technician Actions */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-4">
+
+                  {/* Action 1: Start Work (for ASSIGNED or REOPENED) */}
+                  {(isAssigned || isReopened) && (
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-white flex items-center gap-2">
+                          <Play className="w-4 h-4 text-cyan-400 fill-cyan-400" />
+                          {isReopened ? 'Re-Start Repair Work On-Site' : 'Start Repair Work On-Site'}
+                        </span>
+                        <span className="text-slate-400 text-[11px]">Click when arriving at repair location</span>
+                      </div>
+
+                      <button
+                        onClick={() => handleStartWork(wo.id)}
+                        disabled={isCurrentActionLoading}
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isCurrentActionLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating Status to IN_PROGRESS...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 fill-white" />
+                            {isReopened ? 'Start Repair Work Again' : 'Start Repair Work'}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action 2: Upload After-Repair Photo (for IN_PROGRESS) */}
+                  {isInProgress && (
+                    <div className="p-5 rounded-xl bg-slate-900/90 border border-cyan-800/80 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-xs flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-emerald-400" />
+                          Submit Completed Repair Evidence
+                        </span>
+                        <span className="text-[10px] font-mono text-cyan-300 uppercase">Step 2: Proof Submission</span>
+                      </div>
+
+                      {/* File Upload Control */}
+                      <div className="space-y-3">
+                        <label className="block text-xs font-medium text-slate-300">
+                          Upload After-Repair Photograph (Required for 2nd-Stage AI Verification):
+                        </label>
+
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileSelect(wo.id, e.target.files?.[0] || null)}
+                          className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-cyan-950 file:text-cyan-300 hover:file:bg-cyan-900 cursor-pointer"
+                        />
+
+                        {/* Image Preview */}
+                        {previewUrl && (
+                          <div className="p-2 rounded-xl bg-slate-950 border border-emerald-700/60 space-y-1">
+                            <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold block">Selected Proof Image Preview:</span>
+                            <img src={previewUrl} alt="Preview" className="w-full max-h-48 object-contain rounded-lg bg-slate-950" />
+                          </div>
+                        )}
+
+                        {/* Technician Notes */}
+                        <div className="space-y-1 pt-1">
+                          <label className="block text-[11px] font-mono text-slate-400">Technician Repair Notes (Optional):</label>
+                          <textarea
+                            rows={2}
+                            value={techNotes[wo.id] || ''}
+                            onChange={(e) => setTechNotes((prev) => ({ ...prev, [wo.id]: e.target.value }))}
+                            placeholder="Describe parts replaced, seal applied, or work performed..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Submit Proof Trigger */}
+                      <button
+                        onClick={() => handleSubmitRepair(wo.id)}
+                        disabled={isCurrentActionLoading || !selectedFiles[wo.id]}
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isCurrentActionLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading Proof to Cloudinary...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Submit Repair Proof for AI Verification
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Status Indicator for PENDING_VERIFICATION */}
+                  {isPendingVerification && (
+                    <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-800 text-xs space-y-1">
+                      <div className="flex items-center gap-2 text-indigo-300 font-bold font-mono">
+                        <Clock className="w-4 h-4 text-indigo-400" />
+                        Awaiting 2nd-Stage Multimodal AI Repair Verification
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed">
+                        After-repair evidence has been uploaded. Supervisors can trigger AI verification on the Issue Command Center screen.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Status Indicator for VERIFIED or CLOSED */}
+                  {isVerifiedOrClosed && (
+                    <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800 text-xs space-y-1">
+                      <div className="flex items-center gap-2 text-emerald-300 font-bold font-mono">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Repair Verified & Issue Closed Cleanly
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
               </div>
             );
           })}
