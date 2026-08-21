@@ -3,12 +3,15 @@ import { uploadImageToCloudinary } from '@/lib/storage/cloudinary';
 import { executeUpdateWorkOrderStatus } from '@/lib/tools/updateWorkOrderStatus';
 import { validateImageFile } from '@/lib/validation/schemas';
 import { sanitizeServerError, AppError } from '@/lib/errors';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const correlationId = `req_${Date.now().toString(36)}`;
+
   try {
     const { id: workOrderId } = await params;
 
@@ -39,6 +42,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       nextStatus: 'PENDING_VERIFICATION',
       afterImageUrl: uploadResult.url,
       technicianNotes,
+    });
+
+    const issueId = (updatedWO as any)?.issueId || (updatedWO as any)?.issue_id;
+    const technicianId = (updatedWO as any)?.technicianId || (updatedWO as any)?.technician_id;
+
+    await logAuditEvent({
+      issueId,
+      workOrderId: updatedWO.id,
+      technicianId: technicianId || undefined,
+      eventType: 'REPAIR_SUBMITTED',
+      previousStatus: 'IN_PROGRESS',
+      newStatus: 'PENDING_VERIFICATION',
+      actorType: 'TECHNICIAN',
+      details: 'Technician completed work and uploaded after-repair evidence photo.',
+      correlationId,
     });
 
     return NextResponse.json(

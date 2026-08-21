@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeUpdateWorkOrderStatus } from '@/lib/tools/updateWorkOrderStatus';
 import { sanitizeServerError, AppError } from '@/lib/errors';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const correlationId = `req_${Date.now().toString(36)}`;
+
   try {
     const { id: workOrderId } = await params;
 
@@ -17,6 +20,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const updatedWO = await executeUpdateWorkOrderStatus({
       workOrderId,
       nextStatus: 'IN_PROGRESS',
+    });
+
+    const issueId = (updatedWO as any)?.issueId || (updatedWO as any)?.issue_id;
+    const technicianId = (updatedWO as any)?.technicianId || (updatedWO as any)?.technician_id;
+
+    await logAuditEvent({
+      issueId,
+      workOrderId: updatedWO.id,
+      technicianId: technicianId || undefined,
+      eventType: 'WORK_STARTED',
+      newStatus: 'IN_PROGRESS',
+      actorType: 'TECHNICIAN',
+      details: 'Technician initiated repair work on site.',
+      correlationId,
     });
 
     return NextResponse.json(

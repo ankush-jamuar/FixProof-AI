@@ -1,5 +1,6 @@
 import { WorkOrderStatus } from '@/types/domain';
 import { AppError } from '@/lib/errors';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 /**
  * Strict state machine mapping for FixProof AI work orders and issues.
@@ -23,6 +24,16 @@ export function validateStatusTransition(currentStatus: WorkOrderStatus, nextSta
 
   const allowed = VALID_STATUS_TRANSITIONS[currentStatus] || [];
   if (!allowed.includes(nextStatus)) {
+    // Log rejected status transition attempt
+    logAuditEvent({
+      eventType: 'ILLEGAL_STATUS_TRANSITION_REJECTED',
+      previousStatus: currentStatus,
+      newStatus: nextStatus,
+      actorType: 'SYSTEM',
+      details: `State machine rejected illegal transition from ${currentStatus} to ${nextStatus}.`,
+      success: false,
+    });
+
     throw new AppError(
       'VALIDATION_ERROR',
       `Invalid status transition from ${currentStatus} to ${nextStatus}.`,

@@ -11,7 +11,10 @@ import {
   Activity, 
   ChevronDown, 
   ChevronUp,
-  Info
+  Info,
+  Clock,
+  Zap,
+  Gauge
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 import { EVALUATION_CASES } from '@/lib/evaluation/cases';
@@ -78,6 +81,14 @@ export default function EvaluationHarnessPage() {
     setExpandedCaseId(expandedCaseId === id ? null : id);
   };
 
+  const avgLatency = suiteSummary && suiteSummary.results.length > 0
+    ? Math.round(suiteSummary.durationMs / suiteSummary.results.length)
+    : 0;
+
+  const slowestCase = suiteSummary && suiteSummary.results.length > 0
+    ? [...suiteSummary.results].sort((a, b) => b.durationMs - a.durationMs)[0]
+    : null;
+
   return (
     <div className="space-y-8 py-4">
       
@@ -125,11 +136,11 @@ export default function EvaluationHarnessPage() {
         />
       )}
 
-      {/* Disclaimer Banner: Benchmark vs Real-World Accuracy */}
+      {/* Disclaimer Banner */}
       <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-start gap-3 text-xs text-slate-300">
         <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <span className="font-bold text-white block">System Benchmark Evaluation vs Real-World AI Vision Accuracy</span>
+          <span className="font-bold text-white block">Deterministic Benchmark Suite vs Live Multimodal AI Accuracy</span>
           <p className="text-slate-400 text-[11px] leading-relaxed">
             These 15 benchmark test cases evaluate system workflow integrity, state machine safeguards, and controlled tool safety. Real-world Gemini API vision perception and verification accuracy depend on ambient lighting, photo resolution, and visual evidence quality.
           </p>
@@ -167,17 +178,13 @@ export default function EvaluationHarnessPage() {
 
         <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2">
           <span className="text-slate-400 font-mono text-[11px] uppercase tracking-wider block">
-            PASSED / FAILED
+            AVERAGE CASE LATENCY
           </span>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold font-mono text-emerald-400">
-              {suiteSummary ? `${suiteSummary.passed} Passed` : '---'}
+            <span className="text-2xl font-bold font-mono text-cyan-400">
+              {suiteSummary ? `${avgLatency}ms / case` : '---'}
             </span>
-            {suiteSummary && suiteSummary.failed > 0 && (
-              <span className="text-xs font-mono text-rose-400 font-bold">
-                {suiteSummary.failed} Failed
-              </span>
-            )}
+            <Gauge className="w-5 h-5 text-cyan-400" />
           </div>
         </div>
 
@@ -190,12 +197,24 @@ export default function EvaluationHarnessPage() {
               {suiteSummary ? `${suiteSummary.durationMs}ms Total` : 'Ready'}
             </div>
             <span className="text-[10px] font-mono text-slate-500 block">
-              Gemini 2.5 Flash &bull; Prompt v1 &bull; Zod Guard
+              Gemini 2.5 Flash &bull; Prompt v1 &bull; Audit Trail Active
             </span>
           </div>
         </div>
 
       </div>
+
+      {/* Slowest Case Alert Callout (if suite ran) */}
+      {slowestCase && (
+        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-cyan-400" />
+            <span className="text-slate-400">Slowest Case Execution:</span>
+            <span className="text-white font-bold">{slowestCase.name}</span>
+          </div>
+          <span className="text-cyan-300 font-bold">{slowestCase.durationMs}ms</span>
+        </div>
+      )}
 
       {/* Evaluation Cases Table */}
       <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden space-y-4 p-6">

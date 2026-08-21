@@ -6,11 +6,14 @@ import {
   getVerificationHistoryByWorkOrderId,
   getLatestVerificationResult
 } from '@/lib/db/queries';
+import { getAuditTrailForIssue } from '@/lib/audit/logger';
 import AnalyzeButton from '@/components/issues/AnalyzeButton';
 import SupervisorOverride from '@/components/issues/SupervisorOverride';
 import AgentDispatchButton from '@/components/issues/AgentDispatchButton';
 import VerifyRepairButton from '@/components/issues/VerifyRepairButton';
 import SupervisorVerificationReview from '@/components/issues/SupervisorVerificationReview';
+import SystemAuditTimeline from '@/components/issues/SystemAuditTimeline';
+import AgentToolTrace from '@/components/issues/AgentToolTrace';
 import { 
   MapPin, 
   Clock, 
@@ -20,14 +23,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cpu,
-  Eye,
   Activity,
   AlertCircle,
   Wrench,
   UserCheck,
-  FileCheck,
   ShieldCheck,
-  ShieldAlert,
   XCircle,
   History
 } from 'lucide-react';
@@ -133,6 +133,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
   const assignedTechnician = workOrder?.technicianId ? await getTechnicianById(workOrder.technicianId) : null;
   const verificationHistory = workOrder ? await getVerificationHistoryByWorkOrderId(workOrder.id) : [];
   const latestVerification = workOrder ? await getLatestVerificationResult(workOrder.id) : null;
+  const auditEvents = await getAuditTrailForIssue(issue.id);
 
   const hasAnalyzed = Boolean(issue.aiCategory && issue.aiConfidence !== null);
   const confidencePercent = issue.aiConfidence !== null && issue.aiConfidence !== undefined 
@@ -149,6 +150,9 @@ export default async function IssueDetailPage({ params }: PageProps) {
   const detectedInfo = (latestVerification?.detectedIssues && typeof latestVerification.detectedIssues === 'object' && !Array.isArray(latestVerification.detectedIssues))
     ? (latestVerification.detectedIssues as Record<string, any>)
     : {};
+
+  // Extract Controlled Tool Trace from agentLogs
+  const toolLogs = (workOrder?.agentLogs as any[]) || [];
 
   return (
     <div className="space-y-8 py-4">
@@ -256,18 +260,6 @@ export default async function IssueDetailPage({ params }: PageProps) {
                   </div>
                 </div>
               </div>
-
-              {/* Agent Decision Audit Log */}
-              {workOrder.agentLogs && (workOrder.agentLogs as any[]).length > 0 && (
-                <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs">
-                  <span className="text-cyan-400 font-mono text-[10px] uppercase tracking-wider block">
-                    AI Agent Reasoning Audit Trail
-                  </span>
-                  <p className="text-slate-300 font-mono text-[11px] leading-relaxed">
-                    {(workOrder.agentLogs as any[])[0]?.details || 'Agent selected technician based on category matching and availability.'}
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
@@ -391,6 +383,14 @@ export default async function IssueDetailPage({ params }: PageProps) {
               )}
             </div>
           )}
+
+          {/* Controlled Tool Execution Trace Panel */}
+          {toolLogs.length > 0 && (
+            <AgentToolTrace logs={toolLogs} />
+          )}
+
+          {/* System Audit Timeline Panel */}
+          <SystemAuditTimeline events={auditEvents} />
 
           {/* Verification History Audit Trail */}
           {verificationHistory.length > 0 && (

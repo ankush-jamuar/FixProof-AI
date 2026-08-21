@@ -3,12 +3,15 @@ import { getWorkOrderByIssueId, getWorkOrderById, updateWorkOrderStatusRecord } 
 import { validateStatusTransition } from '@/lib/agent/stateMachine';
 import { sanitizeServerError, AppError } from '@/lib/errors';
 import { WorkOrderStatus } from '@/types/domain';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const correlationId = `req_${Date.now().toString(36)}`;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -32,9 +35,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const updatedWO = await updateWorkOrderStatusRecord(workOrder.id, nextStatus);
 
+    await logAuditEvent({
+      issueId: workOrder.issueId,
+      workOrderId: workOrder.id,
+      eventType: 'SUPERVISOR_VERIFICATION',
+      previousStatus: workOrder.status,
+      newStatus: nextStatus,
+      actorType: 'SUPERVISOR',
+      details: `Supervisor manually ${action === 'APPROVE' ? 'approved repair (VERIFIED/CLOSED)' : 'rejected repair (REOPENED)'}.`,
+      correlationId,
+    });
+
     if (nextStatus === 'VERIFIED') {
       validateStatusTransition('VERIFIED', 'CLOSED');
       await updateWorkOrderStatusRecord(workOrder.id, 'CLOSED');
+
+      await logAuditEvent({
+        issueId: workOrder.issueId,
+        workOrderId: workOrder.id,
+        eventType: 'ISSUE_CLOSED',
+        previousStatus: 'VERIFIED',
+        newStatus: 'CLOSED',
+        actorType: 'SUPERVISOR',
+        details: 'Issue verified and closed by supervisor.',
+        correlationId,
+      });
     }
 
     return NextResponse.json({

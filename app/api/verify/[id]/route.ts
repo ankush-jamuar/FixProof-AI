@@ -10,6 +10,7 @@ import { verifyRepair } from '@/lib/ai/verification';
 import { validateStatusTransition } from '@/lib/agent/stateMachine';
 import { sanitizeServerError, AppError } from '@/lib/errors';
 import { WorkOrderStatus, VerificationResult } from '@/types/domain';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -29,6 +30,8 @@ async function fetchImageBuffer(url: string): Promise<Buffer> {
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const correlationId = `req_${Date.now().toString(36)}`;
+
   try {
     const { id } = await params;
 
@@ -54,6 +57,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!workOrder.afterImageUrl) {
       throw new AppError('VALIDATION_ERROR', 'No after-repair photograph has been uploaded yet.', 400);
     }
+
+    await logAuditEvent({
+      issueId: issue.id,
+      workOrderId: workOrder.id,
+      eventType: 'VERIFICATION_STARTED',
+      previousStatus: workOrder.status,
+      actorType: 'AI_AGENT',
+      details: 'Started 2nd-stage visual repair verification comparing before vs after evidence.',
+      correlationId,
+    });
 
     // 2. Download image buffers for multimodal AI engine
     const [beforeBuffer, afterBuffer] = await Promise.all([
@@ -93,12 +106,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // 5. Determine next state based on deterministic business rules
     let nextStatus: WorkOrderStatus;
+    let eventType = 'VERIFICATION_COMPLETED';
+
     if (verification.result === 'PASS') {
       nextStatus = 'VERIFIED';
+      eventType = 'VERIFICATION_COMPLETED';
     } else if (verification.result === 'FAIL') {
       nextStatus = 'REOPENED';
+      eventType = 'VERIFICATION_FAILED';
     } else {
       nextStatus = 'PENDING_REVIEW';
+      eventType = 'VERIFICATION_INCONCLUSIVE';
     }
 
     // Validate state transition using state machine
@@ -107,10 +125,39 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Update status in database
     const updatedWO = await updateWorkOrderStatusRecord(workOrder.id, nextStatus);
 
+    await logAuditEvent({
+      issueId: issue.id,
+      workOrderId: workOrder.id,
+      eventType,
+      previousStatus: workOrder.status,
+      newStatus: nextStatus,
+      actorType: 'AI_AGENT',
+      details: `Verification result: ${verification.result} (${(verification.confidence * 100).toFixed(0)}% confidence). ${verification.reasoning}`,
+      metadata: {
+        result: verification.result,
+        confidence: verification.confidence,
+        problemResolved: verification.problemResolved,
+        remainingIssues: verification.remainingIssues,
+        latencyMs,
+      },
+      correlationId,
+    });
+
     // If PASS, cleanly transition to CLOSED
     if (nextStatus === 'VERIFIED') {
       validateStatusTransition('VERIFIED', 'CLOSED');
       await updateWorkOrderStatusRecord(workOrder.id, 'CLOSED');
+
+      await logAuditEvent({
+        issueId: issue.id,
+        workOrderId: workOrder.id,
+        eventType: 'ISSUE_CLOSED',
+        previousStatus: 'VERIFIED',
+        newStatus: 'CLOSED',
+        actorType: 'SYSTEM',
+        details: 'Issue verified successfully and closed.',
+        correlationId,
+      });
     }
 
     return NextResponse.json({

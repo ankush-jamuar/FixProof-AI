@@ -12,6 +12,7 @@ export const CreateWorkOrderInputSchema = z.object({
   description: z.string().min(2, 'Description must be provided'),
   reasoning: z.string().optional(),
   selectedTechnicianName: z.string().optional(),
+  toolTrace: z.array(z.any()).optional(),
 });
 
 export type CreateWorkOrderInput = z.infer<typeof CreateWorkOrderInputSchema>;
@@ -19,13 +20,19 @@ export type CreateWorkOrderInput = z.infer<typeof CreateWorkOrderInputSchema>;
 export async function executeCreateWorkOrder(input: CreateWorkOrderInput): Promise<WorkOrder> {
   const validated = CreateWorkOrderInputSchema.parse(input);
 
-  const agentLog = {
-    timestamp: new Date().toISOString(),
-    step: 'ROUTING_AND_WORK_ORDER_CREATION',
-    action: 'CREATE_WORK_ORDER',
-    details: validated.reasoning || `Assigned ${validated.category} technician for ${validated.severity} severity issue.`,
-    selectedTechnicianName: validated.selectedTechnicianName,
-  };
+  const defaultLogs = [
+    {
+      timestamp: new Date().toISOString(),
+      step: 'ROUTING_AND_WORK_ORDER_CREATION',
+      action: 'CREATE_WORK_ORDER',
+      details: validated.reasoning || `Assigned ${validated.category} technician for ${validated.severity} severity issue.`,
+      selectedTechnicianName: validated.selectedTechnicianName,
+    },
+  ];
+
+  const agentLogs = validated.toolTrace && validated.toolTrace.length > 0
+    ? validated.toolTrace
+    : defaultLogs;
 
   const workOrder = await createWorkOrderRecord({
     issueId: validated.issueId,
@@ -35,7 +42,7 @@ export async function executeCreateWorkOrder(input: CreateWorkOrderInput): Promi
     severity: validated.severity,
     location: validated.location,
     description: validated.description,
-    agentLogs: [agentLog],
+    agentLogs,
   });
 
   return workOrder as WorkOrder;

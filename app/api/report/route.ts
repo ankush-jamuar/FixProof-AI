@@ -3,8 +3,11 @@ import { uploadImageToCloudinary } from '@/lib/storage/cloudinary';
 import { createIssue } from '@/lib/db/queries';
 import { IssueReportFormSchema, validateImageFile } from '@/lib/validation/schemas';
 import { sanitizeServerError, AppError } from '@/lib/errors';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function POST(request: NextRequest) {
+  const correlationId = `req_${Date.now().toString(36)}`;
+
   try {
     const formData = await request.formData();
     const description = formData.get('description') as string;
@@ -36,6 +39,15 @@ export async function POST(request: NextRequest) {
       description,
       location,
       beforeImageUrl: uploadResult.url,
+    });
+
+    await logAuditEvent({
+      issueId: createdIssue.id,
+      eventType: 'ISSUE_REPORTED',
+      newStatus: 'REPORTED',
+      actorType: 'SYSTEM',
+      details: `New issue reported at ${location}. Evidence uploaded safely.`,
+      correlationId,
     });
 
     return NextResponse.json(
