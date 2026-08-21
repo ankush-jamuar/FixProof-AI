@@ -39,3 +39,25 @@ export function validateImageFile(file: File | null): { valid: boolean; error?: 
 
   return { valid: true };
 }
+
+// ----------------------------------------------------
+// AI PERCEPTION SCHEMA
+// ----------------------------------------------------
+export const PerceptionResultSchema = z.object({
+  category: z.enum(['plumbing', 'electrical', 'cleaning']),
+  problem: z
+    .string()
+    .min(3, { message: 'Problem description must be at least 3 characters.' })
+    .max(500, { message: 'Problem description cannot exceed 500 characters.' }),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  confidence: z
+    .number()
+    .min(0, { message: 'Confidence score cannot be below 0.' })
+    .max(1, { message: 'Confidence score cannot exceed 1.' }),
+  reasoning: z
+    .string()
+    .min(5, { message: 'Reasoning must be at least 5 characters.' })
+    .max(1000, { message: 'Reasoning cannot exceed 1000 characters.' }),
+});
+
+export type PerceptionResultValidated = z.infer<typeof PerceptionResultSchema>;

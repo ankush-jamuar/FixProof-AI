@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { uploadImageToCloudinary } from '@/lib/storage/cloudinary';
 import { createIssue } from '@/lib/db/queries';
 import { IssueReportFormSchema, validateImageFile } from '@/lib/validation/schemas';
+import { sanitizeServerError, AppError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,19 +15,13 @@ export async function POST(request: NextRequest) {
     const textValidation = IssueReportFormSchema.safeParse({ description, location });
     if (!textValidation.success) {
       const errorMsg = textValidation.error.issues.map((e: any) => e.message).join(' ');
-      return NextResponse.json(
-        { success: false, error: errorMsg },
-        { status: 400 }
-      );
+      throw new AppError('VALIDATION_ERROR', errorMsg, 400);
     }
 
     // 2. Validate image file
     const fileValidation = validateImageFile(file);
     if (!fileValidation.valid || !file) {
-      return NextResponse.json(
-        { success: false, error: fileValidation.error || 'Invalid file provided.' },
-        { status: 400 }
-      );
+      throw new AppError('VALIDATION_ERROR', fileValidation.error || 'Invalid file provided.', 400);
     }
 
     // 3. Convert file to Buffer for server-side upload
@@ -34,16 +29,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     // 4. Upload to Cloudinary (or local fallback if credentials missing)
-    let uploadResult;
-    try {
-      uploadResult = await uploadImageToCloudinary(buffer, 'fixproof_evidence');
-    } catch (uploadErr: any) {
-      console.error('Cloudinary upload error in /api/report:', uploadErr);
-      return NextResponse.json(
-        { success: false, error: 'Failed to store image evidence. Please try again.' },
-        { status: 500 }
-      );
-    }
+    const uploadResult = await uploadImageToCloudinary(buffer, 'fixproof_evidence');
 
     // 5. Save Issue in Neon PostgreSQL with status = REPORTED
     const createdIssue = await createIssue({
@@ -60,11 +46,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error('Unexpected error in /api/report:', error);
+  } catch (error: unknown) {
+    const safeError = sanitizeServerError(error, '/api/report');
     return NextResponse.json(
-      { success: false, error: 'An unexpected internal server error occurred.' },
-      { status: 500 }
+      {
+        success: false,
+        error: {
+          code: safeError.code,
+          message: safeError.message,
+        },
+      },
+      { status: safeError.statusCode }
     );
   }
 }

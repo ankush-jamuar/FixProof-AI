@@ -1,7 +1,7 @@
 import { db } from './index';
 import * as schema from '@/drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { IssueCategory, Issue } from '@/types/domain';
+import { IssueCategory, IssueSeverity, WorkOrderStatus } from '@/types/domain';
 
 // In-memory fallback cache for local dev mode when Neon DATABASE_URL is not yet connected
 const memoryIssuesStore: any[] = [];
@@ -99,6 +99,65 @@ export async function createIssue(data: {
     return inserted;
   } catch (err) {
     console.error('Failed to create issue in Neon DB:', err);
+    throw err;
+  }
+}
+
+export async function updateIssuePerception(
+  issueId: string,
+  perceptionData: {
+    aiCategory: IssueCategory;
+    aiProblem: string;
+    aiSeverity: IssueSeverity;
+    aiConfidence: number;
+    aiReasoning: string;
+    aiModel: string;
+    aiPromptVersion: string;
+    aiLatencyMs: number;
+    isHighConfidence: boolean;
+  }
+) {
+  const nextStatus: WorkOrderStatus = perceptionData.isHighConfidence ? 'ANALYZING' : 'PENDING_REVIEW';
+
+  if (!isDatabaseConfigured()) {
+    const item = memoryIssuesStore.find(i => i.id === issueId);
+    if (item) {
+      item.aiCategory = perceptionData.aiCategory;
+      item.aiProblem = perceptionData.aiProblem;
+      item.aiSeverity = perceptionData.aiSeverity;
+      item.aiConfidence = perceptionData.aiConfidence;
+      item.aiReasoning = perceptionData.aiReasoning;
+      item.aiModel = perceptionData.aiModel;
+      item.aiPromptVersion = perceptionData.aiPromptVersion;
+      item.aiLatencyMs = perceptionData.aiLatencyMs;
+      item.status = nextStatus;
+      item.updatedAt = new Date();
+      return item;
+    }
+    return null;
+  }
+
+  try {
+    const [updated] = await db
+      .update(schema.issues)
+      .set({
+        aiCategory: perceptionData.aiCategory,
+        aiProblem: perceptionData.aiProblem,
+        aiSeverity: perceptionData.aiSeverity,
+        aiConfidence: perceptionData.aiConfidence,
+        aiReasoning: perceptionData.aiReasoning,
+        aiModel: perceptionData.aiModel,
+        aiPromptVersion: perceptionData.aiPromptVersion,
+        aiLatencyMs: perceptionData.aiLatencyMs,
+        status: nextStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.issues.id, issueId))
+      .returning();
+
+    return updated;
+  } catch (err) {
+    console.error(`Failed to update issue perception for issue ${issueId}:`, err);
     throw err;
   }
 }

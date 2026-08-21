@@ -1,26 +1,52 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { getIssueById } from '@/lib/db/queries';
+import AnalyzeButton from '@/components/issues/AnalyzeButton';
 import { 
-  ShieldCheck, 
   MapPin, 
   Clock, 
   ArrowLeft, 
   ImageIcon, 
-  FileText, 
   Sparkles, 
-  Wrench, 
-  Eye, 
-  AlertCircle,
+  AlertTriangle,
   CheckCircle2,
-  Cpu
+  Cpu,
+  Eye,
+  Activity,
+  AlertCircle
 } from 'lucide-react';
-import { WorkOrderStatus } from '@/types/domain';
+import { IssueCategory, IssueSeverity, WorkOrderStatus } from '@/types/domain';
 
 export const revalidate = 0; // Server-rendered on every request
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+function CategoryBadge({ category }: { category: IssueCategory }) {
+  const colors: Record<IssueCategory, string> = {
+    plumbing: 'bg-cyan-950 text-cyan-300 border-cyan-700/60',
+    electrical: 'bg-amber-950 text-amber-300 border-amber-700/60',
+    cleaning: 'bg-emerald-950 text-emerald-300 border-emerald-700/60',
+  };
+  return (
+    <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-semibold uppercase border ${colors[category] || colors.plumbing}`}>
+      {category}
+    </span>
+  );
+}
+
+function SeverityBadge({ severity }: { severity: IssueSeverity }) {
+  const colors: Record<IssueSeverity, string> = {
+    low: 'bg-slate-900 text-slate-300 border-slate-700',
+    medium: 'bg-blue-950 text-blue-300 border-blue-700/60',
+    high: 'bg-amber-950 text-amber-300 border-amber-700/60',
+    critical: 'bg-rose-950 text-rose-300 border-rose-700/60',
+  };
+  return (
+    <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-semibold uppercase border ${colors[severity] || colors.medium}`}>
+      {severity} severity
+    </span>
+  );
 }
 
 export default async function IssueDetailPage({ params }: PageProps) {
@@ -47,6 +73,12 @@ export default async function IssueDetailPage({ params }: PageProps) {
     );
   }
 
+  const hasAnalyzed = Boolean(issue.aiCategory && issue.aiConfidence !== null);
+  const confidencePercent = issue.aiConfidence !== null && issue.aiConfidence !== undefined 
+    ? Math.round(issue.aiConfidence * 100) 
+    : 0;
+  const isHighConfidence = confidencePercent >= 80;
+
   return (
     <div className="space-y-8 py-4">
       
@@ -64,10 +96,10 @@ export default async function IssueDetailPage({ params }: PageProps) {
         </span>
       </div>
 
-      {/* Main Grid: Evidence & Issue Info vs AI & Closed-Loop Modules */}
+      {/* Main Grid: Evidence & Details vs AI Perception Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column (2 Cols): Reported Evidence & Details */}
+        {/* Left Column (2 Cols): Evidence & Details */}
         <div className="lg:col-span-2 space-y-6">
           
           {/* Main Evidence Card */}
@@ -75,7 +107,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 text-xs font-mono">
                 <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                PRIMARY EVIDENCE PHOTO
+                ORIGINAL EVIDENCE PHOTO
               </div>
               <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-900 text-cyan-300 border border-slate-800">
                 STATUS: {issue.status}
@@ -100,7 +132,7 @@ export default async function IssueDetailPage({ params }: PageProps) {
 
               <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-1">
                 <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">
-                  Original Description
+                  Original User Description
                 </span>
                 <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
                   {issue.description}
@@ -118,44 +150,40 @@ export default async function IssueDetailPage({ params }: PageProps) {
 
           {/* Reserved Section for Future Stages */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* AI Agent Reasoning & Routing Placeholder */}
             <div className="glass-panel p-5 rounded-2xl border border-slate-800/80 space-y-3">
               <div className="flex items-center gap-2 text-indigo-400 font-mono text-xs">
                 <Cpu className="w-4 h-4" />
                 AI AGENT & CONTROLLED TOOLS
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Work order routing, technician matching, and controlled tool operations will occur here in Stage 5.
+                Technician matching and controlled tool operations occur in Stage 5.
               </p>
               <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-slate-500 text-[11px] font-mono border border-slate-800">
                 STAGE 5 REASONING PENDING
               </span>
             </div>
 
-            {/* AI Verification Audit Placeholder */}
             <div className="glass-panel p-5 rounded-2xl border border-slate-800/80 space-y-3">
               <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
                 <Eye className="w-4 h-4" />
                 2ND STAGE AI VERIFICATION
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Independent visual verification comparing Before vs After repair photos will occur here in Stage 7.
+                Before vs After visual repair verification occurs in Stage 7.
               </p>
               <span className="inline-block px-2.5 py-1 rounded bg-slate-900 text-slate-500 text-[11px] font-mono border border-slate-800">
                 STAGE 7 VERIFICATION PENDING
               </span>
             </div>
-
           </div>
 
         </div>
 
-        {/* Right Column (1 Col): AI Perception & Timeline Sidebar */}
+        {/* Right Column (1 Col): AI Perception Sidebar & Action */}
         <div className="space-y-6">
           
-          {/* AI Perception Status Card */}
-          <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4">
+          {/* AI Perception Engine Card */}
+          <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-white text-sm flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-cyan-400" />
@@ -166,82 +194,152 @@ export default async function IssueDetailPage({ params }: PageProps) {
               </span>
             </div>
 
-            {issue.aiCategory ? (
-              <div className="space-y-3 text-xs">
-                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
-                  <span className="text-slate-400 block font-mono text-[10px]">CATEGORY & PROBLEM</span>
-                  <span className="text-cyan-300 font-bold uppercase">{issue.aiCategory}</span>
-                  <span className="text-slate-300 block">{issue.aiProblem}</span>
+            {/* Analyze Button */}
+            <AnalyzeButton issueId={issue.id} hasAnalyzed={hasAnalyzed} />
+
+            {/* Live Analysis Display */}
+            {hasAnalyzed ? (
+              <div className="space-y-4 pt-2">
+                
+                {/* Confidence Badge & Meter */}
+                <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-slate-400">AI CONFIDENCE SCORE</span>
+                    <span className={`text-sm font-bold font-mono ${isHighConfidence ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {confidencePercent}%
+                    </span>
+                  </div>
+                  
+                  {/* Meter bar */}
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${isHighConfidence ? 'bg-gradient-to-r from-cyan-500 to-emerald-500' : 'bg-gradient-to-r from-amber-500 to-rose-500'}`}
+                      style={{ width: `${confidencePercent}%` }}
+                    ></div>
+                  </div>
+
+                  {/* High Confidence vs Human Review Banner */}
+                  <div className="pt-1">
+                    {isHighConfidence ? (
+                      <div className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        High Confidence (&ge;80%) &mdash; Perception Accepted
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <AlertTriangle className="w-4 h-4 text-amber-400" />
+                          Human Review Required
+                        </div>
+                        <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                          AI confidence is below the 80% threshold. Supervisor verification is required before routing.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
-                  <span className="text-slate-400 block font-mono text-[10px]">SEVERITY & CONFIDENCE</span>
-                  <span className="text-amber-300 font-semibold capitalize">{issue.aiSeverity} severity</span>
-                  <span className="text-slate-400 block">Confidence: {((issue.aiConfidence || 0) * 100).toFixed(0)}%</span>
+
+                {/* Categorization & Severity */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Category:</span>
+                    {issue.aiCategory && <CategoryBadge category={issue.aiCategory} />}
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Severity:</span>
+                    {issue.aiSeverity && <SeverityBadge severity={issue.aiSeverity} />}
+                  </div>
                 </div>
+
+                {/* Identified Problem */}
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block">
+                    AI Identified Problem
+                  </span>
+                  <p className="text-xs text-white font-medium">
+                    {issue.aiProblem}
+                  </p>
+                </div>
+
+                {/* Evidence Reasoning */}
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                    Evidence-Based Reasoning
+                  </span>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {issue.aiReasoning}
+                  </p>
+                </div>
+
+                {/* Model Telemetry */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-1 font-mono text-[10px] text-slate-500">
+                  <div className="flex items-center justify-between">
+                    <span>Model:</span>
+                    <span className="text-slate-400">{issue.aiModel || 'gemini-2.5-flash'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Prompt Ver:</span>
+                    <span className="text-slate-400">{issue.aiPromptVersion || 'v1'}</span>
+                  </div>
+                  {issue.aiLatencyMs && (
+                    <div className="flex items-center justify-between">
+                      <span>Latency:</span>
+                      <span className="text-slate-400">{issue.aiLatencyMs} ms</span>
+                    </div>
+                  )}
+                </div>
+
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
                 <Clock className="w-6 h-6 text-slate-500 mx-auto animate-pulse" />
-                <span className="text-xs font-medium text-slate-300 block">AI Perception Pending</span>
+                <span className="text-xs font-medium text-slate-300 block">AI Analysis Pending</span>
                 <p className="text-[11px] text-slate-500 leading-normal">
-                  Multimodal vision parsing into structured category, problem, and severity schemas will execute in Stage 3.
+                  Click "Analyze Issue with AI" above to run multimodal vision parsing into structured category and severity schemas.
                 </p>
               </div>
             )}
           </div>
 
-          {/* Closed-Loop Decision Timeline */}
+          {/* Timeline */}
           <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4">
             <h3 className="font-bold text-white text-sm flex items-center gap-2">
-              <Clock className="w-4 h-4 text-cyan-400" />
-              Closed-Loop Workflow Timeline
+              <Activity className="w-4 h-4 text-cyan-400" />
+              Workflow Timeline
             </h3>
 
-            <div className="relative pl-6 space-y-6 border-l border-slate-800">
-              
-              {/* Step 1: Reported */}
+            <div className="relative pl-6 space-y-5 border-l border-slate-800 text-xs">
               <div className="relative">
-                <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-cyan-500 border-2 border-slate-950 flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-slate-950"></div>
-                </div>
+                <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-cyan-500 border-2 border-slate-950"></div>
                 <div>
-                  <h4 className="text-xs font-bold text-cyan-300">1. Issue Reported & Evidence Saved</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Original photo uploaded to Cloudinary, issue created in Neon PostgreSQL.
-                  </p>
-                  <span className="text-[10px] font-mono text-slate-500 block mt-1">
+                  <h4 className="font-bold text-cyan-300">1. Issue Reported</h4>
+                  <span className="text-[10px] font-mono text-slate-500 block">
                     {new Date(issue.createdAt).toLocaleTimeString()}
                   </span>
                 </div>
               </div>
 
-              {/* Step 2: AI Perception */}
-              <div className="relative opacity-60">
-                <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-slate-800 border-2 border-slate-950"></div>
+              <div className={`relative ${hasAnalyzed ? '' : 'opacity-50'}`}>
+                <div className={`absolute -left-[31px] top-0.5 w-4 h-4 rounded-full border-2 border-slate-950 ${hasAnalyzed ? 'bg-indigo-500' : 'bg-slate-800'}`}></div>
                 <div>
-                  <h4 className="text-xs font-medium text-slate-400">2. Multimodal AI Perception</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Pending Stage 3 Gemini vision analysis.</p>
+                  <h4 className={`font-medium ${hasAnalyzed ? 'text-indigo-300 font-bold' : 'text-slate-400'}`}>
+                    2. AI Perception Analysis
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {hasAnalyzed 
+                      ? `${issue.aiCategory?.toUpperCase()} (${confidencePercent}% confidence)` 
+                      : 'Pending manual trigger'}
+                  </p>
                 </div>
               </div>
 
-              {/* Step 3: Agent Routing */}
-              <div className="relative opacity-60">
+              <div className="relative opacity-50">
                 <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-slate-800 border-2 border-slate-950"></div>
                 <div>
-                  <h4 className="text-xs font-medium text-slate-400">3. Work Order Routing</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Pending Stage 5 agent tool selection.</p>
+                  <h4 className="font-medium text-slate-400">3. Work Order Routing</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Stage 5 agent tool selection</p>
                 </div>
               </div>
-
-              {/* Step 4: Verification */}
-              <div className="relative opacity-60">
-                <div className="absolute -left-[31px] top-0.5 w-4 h-4 rounded-full bg-slate-800 border-2 border-slate-950"></div>
-                <div>
-                  <h4 className="text-xs font-medium text-slate-400">4. AI Verification & Closure</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Pending Stage 7 before vs after visual verification.</p>
-                </div>
-              </div>
-
             </div>
           </div>
 
