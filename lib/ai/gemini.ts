@@ -32,11 +32,23 @@ export class GeminiProvider implements AIProvider {
 
     const contents: any[] = [];
 
-    // Attach image if buffer is provided
+    // Attach BEFORE image if buffer is provided
     if (input.imageBuffer) {
+      contents.push({ text: 'BEFORE REPAIR EVIDENCE PHOTOGRAPH:' });
       contents.push({
         inlineData: {
           data: input.imageBuffer.toString('base64'),
+          mimeType: input.mimeType || 'image/jpeg',
+        },
+      });
+    }
+
+    // Attach AFTER image if buffer is provided
+    if (input.afterImageBuffer) {
+      contents.push({ text: 'AFTER REPAIR EVIDENCE PHOTOGRAPH SUBMITTED BY TECHNICIAN:' });
+      contents.push({
+        inlineData: {
+          data: input.afterImageBuffer.toString('base64'),
           mimeType: input.mimeType || 'image/jpeg',
         },
       });

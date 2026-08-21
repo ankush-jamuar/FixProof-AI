@@ -13,7 +13,8 @@ import {
   AlertCircle, 
   Eye,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
 import { WorkOrderStatus, IssueCategory, IssueSeverity } from '@/types/domain';
@@ -224,6 +225,7 @@ export default function TechnicianPortalPage() {
         <div className="space-y-6">
           {assignedWorkOrders.map((wo) => {
             const isAssigned = wo.status === 'ASSIGNED';
+            const isReopened = wo.status === 'REOPENED';
             const isInProgress = wo.status === 'IN_PROGRESS';
             const isPendingVerification = wo.status === 'PENDING_VERIFICATION';
 
@@ -246,6 +248,8 @@ export default function TechnicianPortalPage() {
                   <span className={`px-3 py-1 rounded-full text-xs font-mono font-semibold border ${
                     isAssigned
                       ? 'bg-blue-950 text-blue-300 border-blue-700'
+                      : isReopened
+                      ? 'bg-rose-950 text-rose-300 border-rose-700 shadow-sm shadow-rose-500/20'
                       : isInProgress
                       ? 'bg-purple-950 text-purple-300 border-purple-700'
                       : 'bg-yellow-950 text-yellow-300 border-yellow-700'
@@ -253,6 +257,19 @@ export default function TechnicianPortalPage() {
                     {wo.status}
                   </span>
                 </div>
+
+                {/* Reopened Alert Banner */}
+                {isReopened && (
+                  <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-1">
+                    <div className="flex items-center gap-2 font-bold">
+                      <AlertCircle className="w-4 h-4 text-rose-400" />
+                      REPAIR VERIFICATION FAILED &mdash; REPAIR REOPENED
+                    </div>
+                    <p className="text-[11px] text-rose-200/90 leading-relaxed">
+                      AI Verification detected remaining unaddressed defect or insufficient proof in previous attempt. Please re-inspect, complete repair, and upload new evidence photo.
+                    </p>
+                  </div>
+                )}
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -293,7 +310,7 @@ export default function TechnicianPortalPage() {
 
                     {/* Action Controls */}
                     <div className="pt-2">
-                      {isAssigned && (
+                      {(isAssigned || isReopened) && (
                         <button
                           onClick={() => handleStartWork(wo.id)}
                           disabled={actionLoadingId === wo.id}
@@ -301,10 +318,12 @@ export default function TechnicianPortalPage() {
                         >
                           {actionLoadingId === wo.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : isReopened ? (
+                            <RefreshCw className="w-4 h-4 text-cyan-300" />
                           ) : (
                             <Play className="w-4 h-4" />
                           )}
-                          Start Repair Work
+                          {isReopened ? 'Start Repair Work Again' : 'Start Repair Work'}
                         </button>
                       )}
 

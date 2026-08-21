@@ -2,7 +2,9 @@ import { ZodSchema } from 'zod';
 
 export interface MultimodalInput {
   imageBuffer?: Buffer;
+  afterImageBuffer?: Buffer;
   imageUrl?: string;
+  afterImageUrl?: string;
   mimeType?: string;
   textPrompt: string;
   systemInstruction?: string;

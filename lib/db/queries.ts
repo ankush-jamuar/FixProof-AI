@@ -1,11 +1,12 @@
 import { db } from './index';
 import * as schema from '@/drizzle/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { IssueCategory, IssueSeverity, WorkOrderStatus } from '@/types/domain';
+import { IssueCategory, IssueSeverity, WorkOrderStatus, VerificationResult } from '@/types/domain';
 
 // In-memory fallback cache for local dev mode when Neon DATABASE_URL is not yet connected
 const memoryIssuesStore: any[] = [];
 const memoryWorkOrdersStore: any[] = [];
+const memoryVerificationStore: any[] = [];
 const memoryTechniciansStore: any[] = [
   { id: 'tech-1', name: 'Rajesh Kumar (Lead Plumber)', category: 'plumbing', isAvailable: true, phone: '+1-555-0101', createdAt: new Date() },
   { id: 'tech-2', name: 'Carlos Mendez (Plumbing Specialist)', category: 'plumbing', isAvailable: true, phone: '+1-555-0102', createdAt: new Date() },
@@ -397,4 +398,95 @@ export async function getWorkOrdersByTechnicianId(technicianId: string) {
   } catch (err) {
     return memoryWorkOrdersStore.filter(w => w.technicianId === technicianId);
   }
+}
+
+// ----------------------------------------------------
+// VERIFICATION RESULTS QUERIES
+// ----------------------------------------------------
+
+export async function saveVerificationRecord(data: {
+  workOrderId: string;
+  issueId: string;
+  beforeImageUrl: string;
+  afterImageUrl: string;
+  result: VerificationResult;
+  confidence: number;
+  reasoning: string;
+  model: string;
+  promptVersion: string;
+  latencyMs: number;
+  problemResolved: boolean;
+  remainingIssues: string[];
+  evidenceAssessment: string;
+}) {
+  const detectedIssuesObject = {
+    problemResolved: data.problemResolved,
+    remainingIssues: data.remainingIssues,
+    evidenceAssessment: data.evidenceAssessment,
+    promptVersion: data.promptVersion,
+  };
+
+  if (!isDatabaseConfigured()) {
+    const mockVerification = {
+      id: `vr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      workOrderId: data.workOrderId,
+      issueId: data.issueId,
+      beforeImageUrl: data.beforeImageUrl,
+      afterImageUrl: data.afterImageUrl,
+      result: data.result,
+      confidence: data.confidence,
+      reasoning: data.reasoning,
+      model: data.model,
+      modelVersion: 'gemini-2.5-flash',
+      latencyMs: data.latencyMs,
+      detectedIssues: detectedIssuesObject,
+      createdAt: new Date(),
+    };
+    memoryVerificationStore.unshift(mockVerification);
+    return mockVerification;
+  }
+
+  try {
+    const [inserted] = await db
+      .insert(schema.verificationResults)
+      .values({
+        workOrderId: data.workOrderId,
+        issueId: data.issueId,
+        beforeImageUrl: data.beforeImageUrl,
+        afterImageUrl: data.afterImageUrl,
+        result: data.result,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+        model: data.model,
+        modelVersion: 'gemini-2.5-flash',
+        latencyMs: data.latencyMs,
+        detectedIssues: detectedIssuesObject,
+      })
+      .returning();
+
+    return inserted;
+  } catch (err) {
+    console.error('Failed to save verification record in Neon DB:', err);
+    throw err;
+  }
+}
+
+export async function getVerificationHistoryByWorkOrderId(workOrderId: string) {
+  if (!isDatabaseConfigured()) {
+    return memoryVerificationStore.filter(v => v.workOrderId === workOrderId);
+  }
+  try {
+    return await db
+      .select()
+      .from(schema.verificationResults)
+      .where(eq(schema.verificationResults.workOrderId, workOrderId))
+      .orderBy(desc(schema.verificationResults.createdAt));
+  } catch (err) {
+    return memoryVerificationStore.filter(v => v.workOrderId === workOrderId);
+  }
+}
+
+export async function getLatestVerificationResult(workOrderId: string) {
+  const history = await getVerificationHistoryByWorkOrderId(workOrderId);
+  return history[0] || null;
 }

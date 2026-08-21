@@ -14,6 +14,7 @@ export type WorkOrderStatus =
   | 'CLOSED';
 
 export type VerificationResultEnum = 'PASS' | 'FAIL' | 'INCONCLUSIVE';
+export type VerificationResult = VerificationResultEnum;
 
 export interface User {
   id: string;

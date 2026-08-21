@@ -61,3 +61,26 @@ export const PerceptionResultSchema = z.object({
 });
 
 export type PerceptionResultValidated = z.infer<typeof PerceptionResultSchema>;
+
+// ----------------------------------------------------
+// AI VERIFICATION SCHEMA (2ND STAGE INDEPENDENT MODEL)
+// ----------------------------------------------------
+export const VerificationResultSchema = z.object({
+  result: z.enum(['PASS', 'FAIL', 'INCONCLUSIVE']),
+  confidence: z
+    .number()
+    .min(0, { message: 'Confidence score must be between 0 and 1.' })
+    .max(1, { message: 'Confidence score must be between 0 and 1.' }),
+  problemResolved: z.boolean(),
+  reasoning: z
+    .string()
+    .min(5, { message: 'Reasoning explanation must be at least 5 characters.' })
+    .max(1000, { message: 'Reasoning explanation cannot exceed 1000 characters.' }),
+  remainingIssues: z.array(z.string()).default([]),
+  evidenceAssessment: z
+    .string()
+    .min(5, { message: 'Evidence assessment must be at least 5 characters.' })
+    .max(1000, { message: 'Evidence assessment cannot exceed 1000 characters.' }),
+});
+
+export type VerificationResultValidated = z.infer<typeof VerificationResultSchema>;
