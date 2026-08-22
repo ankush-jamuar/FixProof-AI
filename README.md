@@ -3,9 +3,17 @@
 **An AI-Powered Closed-Loop Campus Maintenance Intelligence & Proof-First Repair Verification Platform.**
 
 ---
-## Vercel
-    [demo](https://fix-proof-ai-sand.vercel.app)
 
+## Vercel
+
+[Live Demo](https://fix-proof-ai-sand.vercel.app/)
+
+## Contributors
+
+- Ankush Jamuar
+- Vaibhav Kumar
+
+---
 
 ## What is FixProof AI?
 
@@ -421,8 +429,3 @@ FixProof AI is configured for one-click deployment on **Vercel**:
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
-## Contributors
-
-- Ankush Jamuar
-- Vaibhav Kumar
