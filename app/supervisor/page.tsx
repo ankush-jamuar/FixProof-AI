@@ -80,13 +80,13 @@ export default async function SupervisorOperationsPage() {
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-indigo-300 text-xs font-mono">
             <LayoutDashboard className="w-3.5 h-3.5 text-indigo-400" />
-            SUPERVISOR COMMAND CENTER
+            SUPERVISOR OPERATIONS CONSOLE
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white font-sans">
             Campus Maintenance Operations
           </h1>
           <p className="text-slate-400 text-sm max-w-2xl font-sans">
-            Real-time visual maintenance intelligence, AI technician dispatch, and 2nd-stage repair verification.
+            You are viewing the Supervisor Operations Console — Monitor incidents, technician activity, AI confidence, verification status, and operational risk.
           </p>
         </div>
 

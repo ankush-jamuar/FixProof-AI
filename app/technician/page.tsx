@@ -191,8 +191,8 @@ export default function TechnicianPortalPage() {
             <h1 className="text-2xl font-extrabold text-white tracking-tight">
               My Field Dispatch Jobs
             </h1>
-            <p className="text-slate-400 text-xs">
-              Mobile-optimized portal for campus technicians to inspect issues, record repairs, and upload after-repair evidence.
+            <p className="text-slate-400 text-xs font-sans">
+              You are viewing the Technician Field Portal — Only work orders assigned to this technician are shown.
             </p>
           </div>
 
