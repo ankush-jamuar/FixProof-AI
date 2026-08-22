@@ -14,16 +14,27 @@ export function computeOperationalRisk(issue: {
   status: WorkOrderStatus;
   aiConfidence?: number | null;
   aiCategory?: string | null;
+  isRecurringPattern?: boolean;
 }): OperationalRiskAssessment {
   const status = issue.status;
   const severity = issue.severity || 'medium';
   const confidence = issue.aiConfidence !== null && issue.aiConfidence !== undefined ? issue.aiConfidence : 1;
+  const isRecurring = Boolean(issue.isRecurringPattern);
 
   // 1. CRITICAL ATTENTION
   if (status === 'REOPENED') {
     return {
       level: 'CRITICAL',
       reason: 'Verification failed — active repair defect remains.',
+      badgeStyle: 'bg-rose-950 text-rose-300 border-rose-600',
+      borderStyle: 'border-rose-800/80 shadow-rose-950/40',
+    };
+  }
+
+  if (isRecurring && (severity === 'high' || severity === 'critical')) {
+    return {
+      level: 'CRITICAL',
+      reason: 'Recurring failure pattern in high-severity location — root-cause inspection needed.',
       badgeStyle: 'bg-rose-950 text-rose-300 border-rose-600',
       borderStyle: 'border-rose-800/80 shadow-rose-950/40',
     };

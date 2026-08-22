@@ -18,6 +18,8 @@ import {
   RefreshCw, 
   ArrowRight
 } from 'lucide-react';
+import { getMaintenanceInsights } from '@/lib/intelligence/maintenanceInsights';
+import MaintenanceInsightsPanel from '@/components/issues/MaintenanceInsightsPanel';
 import { IssueCategory, IssueSeverity, WorkOrderStatus } from '@/types/domain';
 
 export const revalidate = 0; // Server-rendered on every request
@@ -53,6 +55,12 @@ export default async function SupervisorOperationsPage() {
   const issues = await getAllIssues();
   const workOrders = await getAllWorkOrders();
   const technicians = await getAllTechnicians();
+  const maintenanceInsights = await getMaintenanceInsights();
+
+  // Map of issue IDs that are part of recurring patterns
+  const recurringIssueIds = new Set(
+    maintenanceInsights.flatMap((m) => m.supportingIssueIds)
+  );
 
   // Calculate Operational KPI Metrics
   const totalOpen = issues.filter(i => i.status !== 'CLOSED' && i.status !== 'VERIFIED').length;
@@ -68,6 +76,7 @@ export default async function SupervisorOperationsPage() {
       severity: i.aiSeverity,
       status: i.status as WorkOrderStatus,
       aiConfidence: i.aiConfidence,
+      isRecurringPattern: recurringIssueIds.has(i.id),
     });
     return risk.level === 'CRITICAL' || risk.level === 'HIGH';
   });
@@ -214,6 +223,9 @@ export default async function SupervisorOperationsPage() {
           </div>
         </div>
       )}
+
+      {/* HISTORICAL MAINTENANCE INTELLIGENCE SECTION */}
+      <MaintenanceInsightsPanel insights={maintenanceInsights} />
 
       {/* Active Operations Queue Table */}
       <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden space-y-4 p-6">

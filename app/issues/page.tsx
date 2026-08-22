@@ -41,7 +41,14 @@ function StatusBadge({ status }: { status: WorkOrderStatus }) {
   );
 }
 
-export default async function IssuesPage() {
+interface IssuesPageProps {
+  searchParams: Promise<{ ids?: string }>;
+}
+
+export default async function IssuesPage({ searchParams }: IssuesPageProps) {
+  const resolvedParams = await searchParams;
+  const filterIds = resolvedParams?.ids ? resolvedParams.ids.split(',') : null;
+
   let issuesList: Array<{
     id: string;
     title: string;
@@ -53,7 +60,12 @@ export default async function IssuesPage() {
   }> = [];
 
   try {
-    issuesList = await getAllIssues();
+    const rawList = await getAllIssues();
+    if (filterIds && filterIds.length > 0) {
+      issuesList = rawList.filter((i) => filterIds.includes(i.id));
+    } else {
+      issuesList = rawList;
+    }
   } catch (err) {
     console.error('Failed to load issues from database:', err);
   }
@@ -84,6 +96,19 @@ export default async function IssuesPage() {
           Report New Issue
         </Link>
       </div>
+
+      {/* Active Filter Indicator */}
+      {filterIds && filterIds.length > 0 && (
+        <div className="p-3.5 rounded-xl bg-cyan-950/60 border border-cyan-800 flex items-center justify-between gap-3 text-xs font-mono">
+          <span className="text-cyan-300 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-cyan-400" />
+            Filtered by Maintenance Intelligence Pattern: Showing {issuesList.length} related issue{issuesList.length !== 1 ? 's' : ''}
+          </span>
+          <Link href="/issues" className="underline hover:text-white text-slate-400">
+            Clear Filter &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* Issues Grid */}
       {issuesList.length === 0 ? (
